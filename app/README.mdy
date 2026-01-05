@@ -1,0 +1,86 @@
+# monst 環境構築手順（Docker / WSL）
+
+このREADMEは、`monst/` を GitHub からクローンして  
+**Docker コンテナ起動 → 疎通確認 → 日々の開発 → frontend差分更新**  
+までをまとめたものです。
+
+---
+
+## 前提
+
+- Windows + WSL2（Ubuntu 等）
+- Docker Desktop インストール済み
+- Docker Desktop の **WSL Integration** が有効  
+  Docker Desktop → Settings → Resources → WSL Integration
+
+---
+
+## 1. リポジトリのクローン
+
+```bash
+cd ~
+git clone <YOUR_GITHUB_REPO_URL> monst
+cd ~/monst/app
+```
+
+`docker-compose.yml` が `~/monst/app` にある前提です。
+
+---
+
+## 2. WSL 必要ツールのインストール
+
+frontend 更新(zip差分反映)で使用します。
+
+```bash
+sudo apt update
+sudo apt install -y unzip rsync
+```
+
+---
+
+## 3. 環境変数ファイル（.env）の準備
+
+```bash
+cd ~/monst/app
+ls -a
+```
+
+`.env` が無ければ作成します（内容はプロジェクト指示に従う）。
+
+---
+
+## 4. Docker Compose 起動
+
+```bash
+cd ~/monst/app
+docker compose up -d
+```
+
+---
+
+## 5. 疎通確認
+
+```bash
+curl http://localhost:8080/health
+curl http://localhost:3000
+```
+
+---
+
+# 日々の開発手順
+
+---
+
+## frontend 更新（zip差分反映）
+
+```bash
+rsync -av --delete /tmp/frontend_update/ ~/monst/app/frontend/
+```
+
+---
+
+## 注意
+
+- `.env` は Git 管理しない
+- frontend: http://localhost:3000
+- backend: http://localhost:8080
