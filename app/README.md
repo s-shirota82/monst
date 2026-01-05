@@ -218,3 +218,105 @@ DBを初期化したい場合（ボリューム削除）：
 ```bash
 docker compose down -v
 ```
+
+# 日々の開発用 手順まとめ（開発者向け）
+
+この章は、日々の開発作業で頻繁に使う **コンテナ起動・停止・再起動・ログ確認・frontend更新後の対応**をまとめたものです。
+
+---
+
+## 開発用コンテナの起動・停止
+
+### すべて起動
+
+```bash
+docker compose up -d
+```
+
+### すべて停止
+
+```bash
+docker compose stop
+```
+
+### コンテナ削除（DB保持）
+
+```bash
+docker compose down
+```
+
+### 完全初期化（DB削除）
+
+```bash
+docker compose down -v
+```
+
+---
+
+## アプリケーション別 再起動
+
+### backend（Spring Boot）
+
+```bash
+docker compose restart backend
+docker logs -f monst-backend
+```
+
+### node（Express）
+
+```bash
+docker compose restart node
+docker logs -f monst-node
+```
+
+### mysql
+
+```bash
+docker compose restart mysql
+```
+
+---
+
+## frontend（Next.js）開発
+
+### ローカル起動
+
+```bash
+cd ~/monst/app/frontend
+pnpm dev -p 3001
+```
+
+### 依存関係更新時
+
+```bash
+pnpm install
+```
+
+---
+
+## frontend 更新パッケージ(zip)差分反映（パターンB）
+
+```bash
+rm -rf /tmp/frontend_update
+mkdir -p /tmp/frontend_update
+unzip /path/to/frontend_update.zip -d /tmp/frontend_update
+rsync -av --delete /tmp/frontend_update/ ~/monst/app/frontend/
+```
+
+---
+
+## よく使うコマンド
+
+```bash
+docker compose ps
+docker compose logs -f
+docker exec -it monst-mysql mysql -u root -p
+```
+
+---
+
+## 注意
+
+- `.env` は Git 管理しない
+- `down -v` は DB 初期化
+- frontend は 3001、API は 8080 / 3000
