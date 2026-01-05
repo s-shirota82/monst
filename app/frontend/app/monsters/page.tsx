@@ -11,18 +11,17 @@ const elementIcons = {
   wood: { icon: Leaf, color: "text-green-500" },
 }
 
-// サンプルモンスターデータ
 const monsters = [
-  { id: 1, name: "炎の守護神", element: "fire", rarity: 5, type: "バランス" },
-  { id: 2, name: "水龍", element: "water", rarity: 5, type: "パワー" },
-  { id: 3, name: "雷獣", element: "thunder", rarity: 4, type: "スピード" },
-  { id: 4, name: "森の精霊", element: "wood", rarity: 4, type: "バランス" },
-  { id: 5, name: "紅蓮の戦士", element: "fire", rarity: 5, type: "パワー" },
-  { id: 6, name: "氷雪の女王", element: "water", rarity: 5, type: "バランス" },
-  { id: 7, name: "電光の使者", element: "thunder", rarity: 4, type: "スピード" },
-  { id: 8, name: "大地の巨人", element: "wood", rarity: 5, type: "パワー" },
-  { id: 9, name: "火焔鳥", element: "fire", rarity: 4, type: "スピード" },
-  { id: 10, name: "深海の王", element: "water", rarity: 4, type: "バランス" },
+  { id: 1, dexNo: "001", name: "炎の守護神", element: "fire", rarity: 5, type: "バランス", evolution: 3 },
+  { id: 2, dexNo: "002", name: "水龍", element: "water", rarity: 5, type: "パワー", evolution: 3 },
+  { id: 3, dexNo: "003", name: "雷獣", element: "thunder", rarity: 4, type: "スピード", evolution: 2 },
+  { id: 4, dexNo: "004", name: "森の精霊", element: "wood", rarity: 4, type: "バランス", evolution: 2 },
+  { id: 5, dexNo: "005", name: "紅蓮の戦士", element: "fire", rarity: 5, type: "パワー", evolution: 3 },
+  { id: 6, dexNo: "006", name: "氷雪の女王", element: "water", rarity: 5, type: "バランス", evolution: 3 },
+  { id: 7, dexNo: "007", name: "電光の使者", element: "thunder", rarity: 4, type: "スピード", evolution: 2 },
+  { id: 8, dexNo: "008", name: "大地の巨人", element: "wood", rarity: 5, type: "パワー", evolution: 3 },
+  { id: 9, dexNo: "009", name: "火焔鳥", element: "fire", rarity: 4, type: "スピード", evolution: 2 },
+  { id: 10, dexNo: "010", name: "深海の王", element: "water", rarity: 4, type: "バランス", evolution: 2 },
 ]
 
 export default function MonstersPage() {
@@ -83,6 +82,9 @@ export default function MonstersPage() {
                     alt={monster.name}
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
+                  <div className="absolute left-2 top-2 rounded bg-background/90 px-2 py-0.5 text-xs font-semibold backdrop-blur-sm">
+                    No.{monster.dexNo}
+                  </div>
                   <div className="absolute right-2 top-2 rounded-full bg-background/80 p-1.5 backdrop-blur-sm">
                     <ElementIcon className={`h-4 w-4 ${elementData.color}`} />
                   </div>
@@ -99,6 +101,7 @@ export default function MonstersPage() {
                     </Badge>
                   </div>
                   <h3 className="text-balance text-sm font-semibold leading-snug">{monster.name}</h3>
+                  <p className="mt-1.5 text-xs text-muted-foreground">進化: {monster.evolution}段階</p>
                 </div>
               </Card>
             )
