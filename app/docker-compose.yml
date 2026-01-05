@@ -37,10 +37,10 @@ services:
       mysql:
         condition: service_healthy
 
-  node:
+  frontend:
     build:
-      context: ./node
-    container_name: monst-node
+      context: ./frontend
+    container_name: monst-frontend
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -51,7 +51,7 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./node:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
