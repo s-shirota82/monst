@@ -1,4 +1,4 @@
-package com.example.monst;
+package com.monst;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

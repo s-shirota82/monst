@@ -1,4 +1,4 @@
-package com.example.monst;
+package com.monst;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
