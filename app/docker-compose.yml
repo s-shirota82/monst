@@ -18,6 +18,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    restart: unless-stopped
 
   backend:
     image: gradle:8.8-jdk21
@@ -36,7 +37,8 @@ services:
     volumes:
       - ./backend:/workspace
       - backend_gradle_cache:/home/gradle/.gradle
-    command: sh -lc "gradle bootRun --no-daemon"
+    # mysql の起動完了を待ってから bootRun（DB接続エラーで落ちっぱなしを防ぐ）
+    command: sh -lc "apt-get update >/dev/null 2>&1 && apt-get install -y netcat-openbsd >/dev/null 2>&1; until nc -z mysql 3306; do echo 'waiting for mysql...'; sleep 1; done; gradle bootRun --no-daemon"
     depends_on:
       mysql:
         condition: service_healthy
@@ -49,14 +51,19 @@ services:
     environment:
       TZ: Asia/Tokyo
       NODE_ENV: development
+      # ブラウザから呼ぶ前提（SSRでコンテナ内から呼ぶなら http://backend:8080 を検討）
       NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+      # Docker/WSL/Windows のファイル変更検知を安定化
+      WATCHPACK_POLLING: "true"
+      WATCHPACK_POLLING_INTERVAL: "500"
     ports:
       - "3000:3000"
     volumes:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
       - frontend_next_cache:/app/.next
-    command: sh -lc "corepack enable && (test -d node_modules || pnpm install) && pnpm dev -p 3000"
+    # next が無ければ install（空ディレクトリで install がスキップされる問題を回避）
+    command: sh -lc "corepack enable && (test -x node_modules/.bin/next || pnpm install) && pnpm dev -p 3000"
     depends_on:
       - backend
     restart: unless-stopped
