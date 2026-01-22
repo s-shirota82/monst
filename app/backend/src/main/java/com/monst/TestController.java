@@ -8,11 +8,11 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-public class UserController {
+public class TestController {
 
   private final JdbcTemplate jdbc;
 
-  public UserController(JdbcTemplate jdbc) {
+  public TestController(JdbcTemplate jdbc) {
     this.jdbc = jdbc;
   }
 
