@@ -1,4 +1,7 @@
 package com.monst.dto.response;
 
-public record RegisterResponse(Long userId, String email, String name) {
+public record RegisterResponse(
+        long id,
+        String email,
+        String name) {
 }

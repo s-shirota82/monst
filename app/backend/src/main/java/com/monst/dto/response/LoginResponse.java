@@ -1,4 +1,6 @@
 package com.monst.dto.response;
 
-public record LoginResponse(Long userId, String email) {
+public record LoginResponse(
+        Long id,
+        String email) {
 }

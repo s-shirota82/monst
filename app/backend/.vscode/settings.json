@@ -1,3 +1,7 @@
 {
-  "java.configuration.updateBuildConfiguration": "automatic"
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "yaml.schemas": {
+    "openapi:v3": "file:///home/wsl_sho/monst/app/backend/src/main/resources/openapi/openapi.yaml"
+  }
 }

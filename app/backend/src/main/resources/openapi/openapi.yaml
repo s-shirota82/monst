@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: Monst API
+  version: 0.1.0
+  description: |
+    開発中のAPI仕様（health / login / register）。
+    エラーレスポンスは ControllerAdvice により統一されます。
+servers:
+  - url: http://localhost:8080
+    description: Local (Docker/WSL)
+
+tags:
+  - name: Health
+    description: ヘルスチェック
+  - name: User
+    description: ユーザー関連
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              examples:
+                ok:
+                  value:
+                    ok: true
+
+  /user/login:
+    post:
+      tags: [User]
+      summary: Login
+      description: |
+        認証不要。メールアドレスとパスワードでログインします。
+        - validation NG: 400（ErrorResponse）
+        - 認証失敗: 401（ErrorResponse）
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              valid:
+                value:
+                  email: test@example.com
+                  password: Abcd1234
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+              examples:
+                ok:
+                  value:
+                    id: 1
+                    email: test@example.com
+        "400":
+          description: Bad Request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validationError:
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Validation failed
+                    details:
+                      - field: email
+                        message: email must be a valid email address
+                      - field: password
+                        message: password must be 8-50 chars, contain letters and numbers, and include at least one uppercase letter
+        "401":
+          description: Unauthorized (invalid credentials)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  value:
+                    code: UNAUTHORIZED
+                    message: Invalid email or password
+                    details: []
+
+  /user/register:
+    post:
+      tags: [User]
+      summary: Register
+      description: |
+        認証不要。新規ユーザー登録します。
+        - validation NG: 400（ErrorResponse）
+        - email 重複: 409（ErrorResponse）
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+            examples:
+              valid:
+                value:
+                  email: test@example.com
+                  password: Abcd1234
+                  name: test
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+              examples:
+                created:
+                  value:
+                    id: 1
+                    email: test@example.com
+                    name: test
+        "400":
+          description: Bad Request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validationError:
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Validation failed
+                    details:
+                      - field: email
+                        message: email must be a valid email address
+                      - field: password
+                        message: password must be 8-50 chars, contain letters and numbers, and include at least one uppercase letter
+                      - field: name
+                        message: name is required
+        "409":
+          description: Conflict (email already used)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                conflict:
+                  value:
+                    code: EMAIL_ALREADY_USED
+                    message: Email already used
+                    details: []
+
+components:
+  schemas:
+    # ---------- Success ----------
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [id, email]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: test@example.com
+
+    RegisterResponse:
+      type: object
+      additionalProperties: false
+      required: [id, email, name]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+          example: test@example.com
+        name:
+          type: string
+          example: test
+
+    # ---------- Requests ----------
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          description: メールアドレス形式
+          example: test@example.com
+        password:
+          type: string
+          format: password
+          description: 8〜50文字、英字+数字の混合、大文字を含む（英数字のみ）
+          minLength: 8
+          maxLength: 50
+          pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
+          example: Abcd1234
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, name]
+      properties:
+        email:
+          type: string
+          format: email
+          description: メールアドレス形式
+          example: test@example.com
+        password:
+          type: string
+          format: password
+          description: 8〜50文字、英字+数字の混合、大文字を含む（英数字のみ）
+          minLength: 8
+          maxLength: 50
+          pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
+          example: Abcd1234
+        name:
+          type: string
+          description: 表示名
+          minLength: 1
+          maxLength: 50
+          example: test
+
+    # ---------- Error (Unified) ----------
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          description: |
+            エラー種別コード。
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - EMAIL_ALREADY_USED
+            - INTERNAL_SERVER_ERROR
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Validation failed
+        details:
+          type: array
+          description: validation の場合のみ field/message を返す。その他は空配列。
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          example: email
+        message:
+          type: string
+          example: email must be a valid email address
