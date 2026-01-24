@@ -2,8 +2,8 @@ package com.monst.service;
 
 import com.monst.dto.request.RegisterRequest;
 import com.monst.dto.response.RegisterResponse;
+import com.monst.exception.EmailAlreadyUsedException;
 import com.monst.repository.UserRepository;
-import com.monst.service.exception.EmailAlreadyUsedException;
 
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;

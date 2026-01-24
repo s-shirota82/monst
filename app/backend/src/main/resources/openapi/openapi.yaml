@@ -3,7 +3,7 @@ info:
   title: Monst API
   version: 0.1.0
   description: |
-    開発中のAPI仕様（health / login / register）。
+    開発中のAPI仕様（health / login / register / monster register）。
     エラーレスポンスは ControllerAdvice により統一されます。
 servers:
   - url: http://localhost:8080
@@ -14,6 +14,8 @@ tags:
     description: ヘルスチェック
   - name: User
     description: ユーザー関連
+  - name: Monster
+    description: モンスター関連
 
 paths:
   /health:
@@ -159,7 +161,128 @@ paths:
                     message: Email already used
                     details: []
 
+  /monster/register:
+    post:
+      tags: [Monster]
+      summary: Register Monster
+      description: |
+        モンスターを登録します（画像2枚 + JSON）。
+        - 認証: 必要（Spring Security）
+        - CSRF: 必要（Cookie/Session運用の場合）
+        - validation NG: 400（ErrorResponse）
+      operationId: registerMonster
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/MonsterRegisterMultipartRequest"
+            encoding:
+              data:
+                contentType: application/json
+              iconImage:
+                contentType: image/png, image/jpeg, image/webp
+              monsterImage:
+                contentType: image/png, image/jpeg, image/webp
+            examples:
+              example:
+                summary: multipart example (data + files)
+                value:
+                  data:
+                    number: 10001
+                    rarity: 6
+                    name: テストモンスター
+                    evolutionStageId: 5
+                    attributeId: 1
+                    hpMax: 25000
+                    hpPlusMax: 27500
+                    attackMax: 28000
+                    attackPlusMax: 31000
+                    speedMax: 350.123
+                    speedPlusMax: 380.456
+                    hitTypeId: 1
+                    tribeId: 13
+                    battleTypeId: 2
+                    strikeShotNameId: 1
+                    strikeShotEffectId: 1
+                    friendshipComboId: 100
+                    specialNote: 0
+                  iconImage: (binary)
+                  monsterImage: (binary)
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MonsterRegisterResponse"
+              examples:
+                created:
+                  value:
+                    id: 123
+        "400":
+          description: Bad Request (validation error)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validationError:
+                  value:
+                    code: VALIDATION_ERROR
+                    message: Validation failed
+                    details:
+                      - field: name
+                        message: name is required
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unauthorized:
+                  value:
+                    code: UNAUTHORIZED
+                    message: Unauthorized
+                    details: []
+        "403":
+          description: Forbidden (CSRF or access denied)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                forbidden:
+                  value:
+                    code: FORBIDDEN
+                    message: Forbidden
+                    details: []
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                unexpected:
+                  value:
+                    code: INTERNAL_SERVER_ERROR
+                    message: Unexpected error occurred
+                    details: []
+
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: |
+        セッションベース認証（例: JSESSIONID）。
+        実際の認証方式に合わせて変更してください。
+
   schemas:
     # ---------- Success ----------
     HealthResponse:
@@ -201,6 +324,16 @@ components:
         name:
           type: string
           example: test
+
+    MonsterRegisterResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 123
 
     # ---------- Requests ----------
     LoginRequest:
@@ -247,6 +380,160 @@ components:
           maxLength: 50
           example: test
 
+    MonsterCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - number
+        - rarity
+        - name
+        - evolutionStageId
+        - attributeId
+        - hpMax
+        - hpPlusMax
+        - attackMax
+        - attackPlusMax
+        - speedMax
+        - speedPlusMax
+        - hitTypeId
+        - tribeId
+        - battleTypeId
+        - strikeShotNameId
+        - strikeShotEffectId
+        - friendshipComboId
+        - specialNote
+      properties:
+        number:
+          type: integer
+          example: 10001
+        rarity:
+          type: integer
+          example: 6
+        name:
+          type: string
+          example: テストモンスター
+        evolutionStageId:
+          type: integer
+          format: int64
+          example: 5
+        attributeId:
+          type: integer
+          format: int64
+          example: 1
+        hpMax:
+          type: integer
+          minimum: 0
+          example: 25000
+        hpPlusMax:
+          type: integer
+          minimum: 0
+          example: 27500
+        attackMax:
+          type: integer
+          minimum: 0
+          example: 28000
+        attackPlusMax:
+          type: integer
+          minimum: 0
+          example: 31000
+        speedMax:
+          type: number
+          format: double
+          example: 350.123
+        speedPlusMax:
+          type: number
+          format: double
+          example: 380.456
+        luckSkillId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        hitTypeId:
+          type: integer
+          format: int64
+          example: 1
+        tribeId:
+          type: integer
+          format: int64
+          example: 13
+        battleTypeId:
+          type: integer
+          format: int64
+          example: 2
+        baseAbility:
+          description: 任意JSON（配列/オブジェクト可）
+          nullable: true
+          oneOf:
+            - type: array
+              items: {}
+            - type: object
+        gaugeAbility:
+          description: 任意JSON（配列/オブジェクト可）
+          nullable: true
+          oneOf:
+            - type: array
+              items: {}
+            - type: object
+        connectSkill:
+          description: 任意JSON（配列/オブジェクト可）
+          nullable: true
+          oneOf:
+            - type: array
+              items: {}
+            - type: object
+        shotSkillId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        assistSkillId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+        strikeShotNameId:
+          type: integer
+          format: int64
+          example: 1
+        strikeShotEffectId:
+          type: integer
+          format: int64
+          example: 1
+        friendshipComboId:
+          type: integer
+          format: int64
+          example: 100
+        subFriendshipComboId:
+          type: integer
+          format: int64
+          nullable: true
+          example: null
+        specialNote:
+          type: integer
+          example: 0
+        seriesInfoId:
+          type: integer
+          format: int64
+          nullable: true
+          example: 1
+
+    MonsterRegisterMultipartRequest:
+      type: object
+      additionalProperties: false
+      required: [data, iconImage, monsterImage]
+      properties:
+        data:
+          $ref: "#/components/schemas/MonsterCreateRequest"
+        iconImage:
+          type: string
+          format: binary
+          description: アイコン画像（png/jpg/webp）
+        monsterImage:
+          type: string
+          format: binary
+          description: モンスター画像（png/jpg/webp）
+
     # ---------- Error (Unified) ----------
     ErrorResponse:
       type: object
@@ -261,6 +548,7 @@ components:
             - UNAUTHORIZED
             - EMAIL_ALREADY_USED
             - INTERNAL_SERVER_ERROR
+            - FORBIDDEN
           example: VALIDATION_ERROR
         message:
           type: string

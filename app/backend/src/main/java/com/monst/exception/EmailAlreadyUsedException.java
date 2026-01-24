@@ -1,4 +1,4 @@
-package com.monst.service.exception;
+package com.monst.exception;
 
 public class EmailAlreadyUsedException extends RuntimeException {
     public EmailAlreadyUsedException() {

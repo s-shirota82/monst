@@ -94,3 +94,10 @@ docker compose down
 ```bash
 docker compose down -v
 ```
+
+### データベースの初期化
+
+```bash
+docker compose down -v
+docker compose up -d --build
+```

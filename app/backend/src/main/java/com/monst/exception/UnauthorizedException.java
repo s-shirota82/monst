@@ -1,4 +1,4 @@
-package com.monst.service.exception;
+package com.monst.exception;
 
 public class UnauthorizedException extends RuntimeException {
     public UnauthorizedException() {

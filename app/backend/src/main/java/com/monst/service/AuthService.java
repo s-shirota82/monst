@@ -2,8 +2,8 @@ package com.monst.service;
 
 import com.monst.dto.request.LoginRequest;
 import com.monst.dto.response.LoginResponse;
+import com.monst.exception.UnauthorizedException;
 import com.monst.repository.UserRepository;
-import com.monst.service.exception.UnauthorizedException;
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
