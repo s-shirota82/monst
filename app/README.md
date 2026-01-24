@@ -16,52 +16,16 @@ Docker + WSL + VSCode を使って開発を始めるまでの手順をまとめ�
 
 ## ディレクトリ構成
 
+```text
 app/
-├── backend/ # Spring Boot
-├── frontend/ # Next.js
+├── backend/   # Spring Boot
+├── frontend/  # Next.js
 ├── mysql/
-│ └── init/ # MySQL 初期化 SQL
+│   └── init/  # MySQL 初期化 SQL
 ├── docker-compose.yml
 ├── .env
 └── README.md
-
----
-
-## 前提条件
-
-- Windows + WSL2（Ubuntu 24.04 など）
-- Docker Desktop インストール済み
-- Docker Desktop の WSL Integration が有効
-
----
-
-## 1. リポジトリのクローン
-
-cd ~
-git clone <YOUR_GITHUB_REPO_URL> monst
-cd ~/monst/app
-
----
-
-## 2. WSL に必要なツールをインストール（初回のみ）
-
-sudo apt update
-sudo apt install -y unzip rsync
-
----
-
-## 3. 環境変数ファイル（.env）
-
-MYSQL_DATABASE=appdb
-MYSQL_USER=appuser
-MYSQL_PASSWORD=apppass
-MYSQL_ROOT_PASSWORD=rootpass
-
----
-
-## 4. 開発環境の起動
-
-docker compose up -d --build
+```
 
 ---
 
@@ -73,27 +37,60 @@ docker compose up -d --build
 
 ---
 
-## 6. 開発の進め方
+## 前提条件
 
-### Frontend
-
-VSCode で編集 → 保存 → 自動ホットリロード
-
-### Backend
-
-VSCode で編集 → 保存 → 自動再起動（DevTools）
+- Windows + WSL2（Ubuntu 24.04 など）
+- Docker Desktop インストール済み
+- Docker Desktop の WSL Integration が有効
 
 ---
 
-## 7. よく使うコマンド
+## 1. 開発環境の構築
 
-docker compose logs -f
-docker compose exec backend sh -lc "gradle test"
-docker compose exec frontend sh -lc "pnpm lint"
+### 1-1. リポジトリのクローン
 
----
+```bash
+git clone <YOUR_GITHUB_REPO_URL> monst
+cd ~/monst/app
+```
 
-## 8. 停止・初期化
+### 1-2. docker構築
 
+```bash
+docker compose up -d --build
+```
+
+## 2. 開発の進め方
+
+### コンテナの起動
+
+```bash
+docker compose start
+
+```
+
+### CI/CD
+
+各ディレクトリに移動 → VSCode で編集 → 保存 → 自動リロード
+
+### コンテナの停止
+
+```bash
+docker compose stop
+
+```
+
+## 3. その他
+
+### コンテナの削除
+
+```bash
 docker compose down
+
+```
+
+### ボリュームの削除
+
+```bash
 docker compose down -v
+```

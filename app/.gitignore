@@ -1,19 +1,45 @@
-# Node / pnpm
-node_modules/
-.pnpm-store/
-**/.pnpm-store/
-.pnpm-debug.log*
+################################
+# 共通
+################################
+# .env
 
-# Next.js
-.next/
-out/
-
-# Logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# OS / Editor
-.DS_Store
+# IDE
 .vscode/
+.idea/
+
+################################
+# Backend (Spring Boot / Gradle)
+################################
+backend/.gradle/
+backend/build/
+backend/out/
+
+# IDE
+backend/.vscode/
+backend/.idea/
+
+################################
+# Frontend (Next.js / pnpm)
+################################
+frontend/node_modules/
+frontend/.next/
+frontend/.pnpm-store/
+frontend/dist/
+frontend/out/
+
+# IDE
+frontend/.vscode/
+frontend/.idea/
+
+################################
+# Docker / Volume 関連
+################################
+# ローカルで作られがちなゴミ
+**/.DS_Store
+**/Thumbs.db
+
+################################
+# MySQL
+################################
+# init SQL は管理対象なので無視しない
+# mysql/init/*.sql は git 管理する
