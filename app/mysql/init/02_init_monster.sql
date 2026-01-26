@@ -1,12 +1,13 @@
 /* =========================================================
-   init.sql（完成形：カラム名整理 + 外部キー追加 + 冪等INSERT）
+   init.sql（完成形：カラム名整理 + 外部キー追加 + 冪等INSERT + 画像カラム）
    - 参照カラムは *_id に統一
    - master の id は BIGINT UNSIGNED
    - 外部キーで整合性担保（InnoDB）
    - seed は ON DUPLICATE KEY UPDATE で冪等
+   - 画像：attribute_master / luck_skill_master / sub_friendship_combo_name_master に image_path 追加
    ========================================================= */
 
--- 文字コードなどは環境に合わせて（必要なら）設定
+-- 必要なら
 -- SET NAMES utf8mb4;
 -- SET time_zone = '+09:00';
 
@@ -15,9 +16,9 @@
 -- =========================
 CREATE TABLE IF NOT EXISTS rarity_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  rarity INT NOT NULL,               -- レア度（1〜6など）
-  max_level INT NOT NULL,            -- 最大レベル
-  label VARCHAR(50) NULL,            -- 表示名（例：レベル上限解放時）
+  rarity INT NOT NULL,
+  max_level INT NOT NULL,
+  label VARCHAR(50) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uk_rarity_master_rarity (rarity)
@@ -40,9 +41,9 @@ ON DUPLICATE KEY UPDATE
 -- =========================
 CREATE TABLE IF NOT EXISTS evolution_stage_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,          -- 形態名
-  level_cap_release TINYINT NOT NULL, -- レベル上限解放（0/1/2）
-  super_battle_release TINYINT NOT NULL, -- 超戦型開放（0/1/2）
+  name VARCHAR(50) NOT NULL,
+  level_cap_release TINYINT NOT NULL,
+  super_battle_release TINYINT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -62,49 +63,53 @@ ON DUPLICATE KEY UPDATE
   super_battle_release = VALUES(super_battle_release);
 
 -- =========================
--- attribute_master
+-- attribute_master（★ image_path 追加）
 -- =========================
 CREATE TABLE IF NOT EXISTS attribute_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(10) NOT NULL,   -- 属性名（火/水/木/光/闇/無）
+  name VARCHAR(10) NOT NULL,
+  image_path VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-INSERT INTO attribute_master (id, name) VALUES
-(1, '火'),
-(2, '水'),
-(3, '木'),
-(4, '光'),
-(5, '闇'),
-(6, '無')
+INSERT INTO attribute_master (id, name, image_path) VALUES
+(1, '火', NULL),
+(2, '水', NULL),
+(3, '木', NULL),
+(4, '光', NULL),
+(5, '闇', NULL),
+(6, '無', NULL)
 ON DUPLICATE KEY UPDATE
-  name = VALUES(name);
+  name = VALUES(name),
+  image_path = VALUES(image_path);
 
 -- =========================
--- luck_skill_master
+-- luck_skill_master（★ image_path 追加）
 -- =========================
 CREATE TABLE IF NOT EXISTS luck_skill_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,   -- ラックスキル名
+  name VARCHAR(50) NOT NULL,
+  image_path VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
-INSERT INTO luck_skill_master (id, name) VALUES
-(1, 'クリティカル'),
-(2, 'シールド'),
-(3, '友情コンボクリティカル'),
-(4, 'ガイド')
+INSERT INTO luck_skill_master (id, name, image_path) VALUES
+(1, 'クリティカル', NULL),
+(2, 'シールド', NULL),
+(3, '友情コンボクリティカル', NULL),
+(4, 'ガイド', NULL)
 ON DUPLICATE KEY UPDATE
-  name = VALUES(name);
+  name = VALUES(name),
+  image_path = VALUES(image_path);
 
 -- =========================
 -- hit_type_master
 -- =========================
 CREATE TABLE IF NOT EXISTS hit_type_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(20) NOT NULL,   -- 撃種名（反射 / 貫通）
+  name VARCHAR(20) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -120,7 +125,7 @@ ON DUPLICATE KEY UPDATE
 -- =========================
 CREATE TABLE IF NOT EXISTS tribe_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(50) NOT NULL,   -- 種族名
+  name VARCHAR(50) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -167,7 +172,7 @@ ON DUPLICATE KEY UPDATE
 -- =========================
 CREATE TABLE IF NOT EXISTS battle_type_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(30) NOT NULL,   -- 戦型名（パワー / バランス / 砲撃 / スピード）
+  name VARCHAR(30) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -181,7 +186,7 @@ ON DUPLICATE KEY UPDATE
   name = VALUES(name);
 
 -- =========================
--- ability_master / ability_stage_master（FKなし：JSON運用のため）
+-- ability_master / ability_stage_master（FKなし：JSON運用想定）
 -- =========================
 CREATE TABLE IF NOT EXISTS ability_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -227,7 +232,7 @@ CREATE TABLE IF NOT EXISTS strike_shot_name_master (
 ) ENGINE=InnoDB;
 
 -- =========================
--- strike_shot_effect_master（name -> strike_shot_name_id）
+-- strike_shot_effect_master（strike_shot_name_id）
 -- =========================
 CREATE TABLE IF NOT EXISTS strike_shot_effect_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -252,7 +257,7 @@ CREATE TABLE IF NOT EXISTS sub_friendship_combo_category_master (
 ) ENGINE=InnoDB;
 
 -- =========================
--- sub_friendship_combo_name_master（attribute/category -> *_id）
+-- sub_friendship_combo_name_master（★ image_path 追加）
 -- =========================
 CREATE TABLE IF NOT EXISTS sub_friendship_combo_name_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -260,20 +265,24 @@ CREATE TABLE IF NOT EXISTS sub_friendship_combo_name_master (
   attribute_id BIGINT UNSIGNED NOT NULL,
   category_id BIGINT UNSIGNED NOT NULL,
   description VARCHAR(255) NOT NULL,
+  image_path VARCHAR(255) NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   KEY idx_sfcn_attr (attribute_id),
   KEY idx_sfcn_cat (category_id),
+
   CONSTRAINT fk_sfcn_attr
     FOREIGN KEY (attribute_id) REFERENCES attribute_master(id)
     ON UPDATE RESTRICT ON DELETE RESTRICT,
+
   CONSTRAINT fk_sfcn_cat
     FOREIGN KEY (category_id) REFERENCES sub_friendship_combo_category_master(id)
     ON UPDATE RESTRICT ON DELETE RESTRICT
 ) ENGINE=InnoDB;
 
 -- =========================
--- sub_friendship_combo_power_master（name -> friendship_combo_name_id / battle_type -> battle_type_id）
+-- sub_friendship_combo_power_master
 -- =========================
 CREATE TABLE IF NOT EXISTS sub_friendship_combo_power_master (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -284,15 +293,19 @@ CREATE TABLE IF NOT EXISTS sub_friendship_combo_power_master (
   power INT NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   KEY idx_sfcp_name (friendship_combo_name_id),
   KEY idx_sfcp_rarity (rarity),
   KEY idx_sfcp_bt (battle_type_id),
+
   CONSTRAINT fk_sfcp_name
     FOREIGN KEY (friendship_combo_name_id) REFERENCES sub_friendship_combo_name_master(id)
     ON UPDATE RESTRICT ON DELETE RESTRICT,
+
   CONSTRAINT fk_sfcp_rarity
     FOREIGN KEY (rarity) REFERENCES rarity_master(rarity)
     ON UPDATE RESTRICT ON DELETE RESTRICT,
+
   CONSTRAINT fk_sfcp_bt
     FOREIGN KEY (battle_type_id) REFERENCES battle_type_master(id)
     ON UPDATE RESTRICT ON DELETE RESTRICT
@@ -310,8 +323,6 @@ CREATE TABLE IF NOT EXISTS series_info_master (
 
 -- =========================
 -- monster_main（参照カラムを *_id に統一）
--- friendship_combo_id / sub_friendship_combo_id は
--- sub_friendship_combo_name_master(id) を参照する想定
 -- =========================
 CREATE TABLE IF NOT EXISTS monster_main (
   id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
@@ -419,3 +430,35 @@ CREATE TABLE IF NOT EXISTS monster_main (
     FOREIGN KEY (series_info_id) REFERENCES series_info_master(id)
     ON UPDATE RESTRICT ON DELETE SET NULL
 ) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------
+-- ここから下は「必要なら」seed を追加して冪等化
+-- （あなたのデータに合わせて入れてください）
+-- ---------------------------------------------------------
+
+-- 例）sub_friendship_combo_category_master seed（冪等）
+-- INSERT INTO sub_friendship_combo_category_master (id, name) VALUES
+-- (1, 'サークル'),
+-- (2, 'ホーミング')
+-- ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- 例）strike_shot_name_master seed（冪等）
+-- INSERT INTO strike_shot_name_master (id, name) VALUES
+-- (1, '終末を告げし堕天の怒り')
+-- ON DUPLICATE KEY UPDATE name = VALUES(name);
+
+-- 例）strike_shot_effect_master seed（冪等）
+-- INSERT INTO strike_shot_effect_master (id, strike_shot_name_id, effect) VALUES
+-- (1, 1, 'ふれた敵にメテオで攻撃')
+-- ON DUPLICATE KEY UPDATE strike_shot_name_id = VALUES(strike_shot_name_id), effect = VALUES(effect);
+
+-- 例）sub_friendship_combo_name_master seed（冪等：image_path含む）
+-- INSERT INTO sub_friendship_combo_name_master
+-- (id, name, attribute_id, category_id, description, image_path) VALUES
+-- (100, 'エナジーサークルL', 4, 1, '近距離に強力なサークル攻撃', 'uploads/masters/friendshipName/energy_circle_l.png')
+-- ON DUPLICATE KEY UPDATE
+--   name=VALUES(name),
+--   attribute_id=VALUES(attribute_id),
+--   category_id=VALUES(category_id),
+--   description=VALUES(description),
+--   image_path=VALUES(image_path);
