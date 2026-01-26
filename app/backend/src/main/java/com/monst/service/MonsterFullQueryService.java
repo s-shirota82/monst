@@ -36,6 +36,21 @@ public class MonsterFullQueryService {
         this.imageBase64Service = imageBase64Service;
     }
 
+    // ★ 追加：7引数版（既存Controller用の後方互換）
+    public MonsterFullListResponse selectAll(
+            String q,
+            Integer rarity,
+            Long attributeId,
+            Long tribeId,
+            Long battleTypeId,
+            int page,
+            int size) {
+        // ここは方針次第：
+        // - 一覧でも画像データを返したいなら true
+        // - 重いのでデフォルトは false にしたいなら false
+        return selectAll(q, rarity, attributeId, tribeId, battleTypeId, page, size, true);
+    }
+
     public MonsterFullListResponse selectAll(
             String q,
             Integer rarity,
@@ -45,12 +60,13 @@ public class MonsterFullQueryService {
             int page,
             int size,
             boolean includeImages) {
+
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
 
         long total = repo.count(q, rarity, attributeId, tribeId, battleTypeId);
-        List<MonsterFullQueryRepository.Row> rows = repo.findPage(q, rarity, attributeId, tribeId, battleTypeId,
-                safePage, safeSize);
+        List<MonsterFullQueryRepository.Row> rows = repo.findPage(
+                q, rarity, attributeId, tribeId, battleTypeId, safePage, safeSize);
 
         Set<Long> abilityIds = new HashSet<>();
         for (var r : rows) {
@@ -78,7 +94,7 @@ public class MonsterFullQueryService {
 
         Map<Long, String> abilityNameMap = abilityRepository.findNamesByIds(new ArrayList<>(abilityIds));
 
-        // 詳細は常に画像を含める（必要なら引数化）
+        // 詳細は常に画像を含める
         return toResponse(row, abilityNameMap, true);
     }
 
@@ -86,6 +102,7 @@ public class MonsterFullQueryService {
             MonsterFullQueryRepository.Row r,
             Map<Long, String> abilityNameMap,
             boolean includeImages) {
+
         MonsterFullResponse.Rarity rarity = new MonsterFullResponse.Rarity(r.rarityValue(), r.rarityMaxLevel());
 
         MonsterFullResponse.EvolutionStage evo = new MonsterFullResponse.EvolutionStage(

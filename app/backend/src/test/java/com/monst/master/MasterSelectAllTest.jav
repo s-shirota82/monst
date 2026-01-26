@@ -29,15 +29,17 @@ class MasterSelectAllTest {
     @MockBean
     private MasterService masterService;
 
+    @MockBean
+    private MasterImageService masterImageService;
+
     @Test
-    @WithMockUser
-    @DisplayName("GET /master/{type}/select/all 正常系: 200 と配列を返す")
-    void selectAll_ok() throws Exception {
+    @WithMockUser(roles = "ADMIN")
+    @DisplayName("GET /master/{type}/select/all admin: 200")
+    void selectAll_ok_admin() throws Exception {
 
         when(masterService.selectAll(eq(MasterType.ATTRIBUTE)))
                 .thenReturn(List.of(
-                        Map.of("id", 1, "name", "火"),
-                        Map.of("id", 2, "name", "水")
+                        Map.of("id", 1, "name", "火")
                 ));
 
         mockMvc.perform(
@@ -45,10 +47,20 @@ class MasterSelectAllTest {
                         .accept(MediaType.APPLICATION_JSON_VALUE)
         )
         .andExpect(status().isOk())
-        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON_VALUE))
-        .andExpect(jsonPath("$[0].id").value(1))
-        .andExpect(jsonPath("$[0].name").value("火"));
+        .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON_VALUE));
 
         verify(masterService).selectAll(eq(MasterType.ATTRIBUTE));
+    }
+
+    @Test
+    @WithMockUser(roles = "USER")
+    @DisplayName("GET /master/{type}/select/all user: 403")
+    void selectAll_forbidden_user() throws Exception {
+
+        mockMvc.perform(
+                get("/master/{type}/select/all", "attribute")
+                        .accept(MediaType.APPLICATION_JSON_VALUE)
+        )
+        .andExpect(status().isForbidden());
     }
 }

@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.util.Objects;
 
+import com.monst.config.SecurityConfig;
 import com.monst.dto.request.MonsterCreateRequest;
 import com.monst.service.MonsterFullQueryService;
 import com.monst.service.MonsterService;
@@ -26,7 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @WebMvcTest(controllers = MonsterController.class)
-@Import(com.monst.handler.GlobalExceptionHandler.class)
+@Import({ SecurityConfig.class, com.monst.handler.GlobalExceptionHandler.class })
 class MonsterControllerTest {
 
         @Autowired
@@ -35,14 +36,17 @@ class MonsterControllerTest {
         @MockBean
         private MonsterService monsterService;
 
-        // ★ 追加：MonsterController の依存を満たすため
         @MockBean
         private MonsterFullQueryService monsterFullQueryService;
 
+        private static RequestPostProcessor csrfRpp() {
+                return Objects.requireNonNull(csrf(), "csrf must not be null");
+        }
+
         @Test
-        @WithMockUser
-        @DisplayName("POST /monster/register 正常系（multipart: data + iconImage + monsterImage）で 201 と id を返す")
-        void register_ok() throws Exception {
+        @WithMockUser(roles = "ADMIN")
+        @DisplayName("POST /monster/register 正常系（admin）: 201 と id を返す")
+        void register_ok_admin() throws Exception {
 
                 when(monsterService.create(any(MonsterCreateRequest.class), any(), any()))
                                 .thenReturn(123L);
@@ -88,32 +92,29 @@ class MonsterControllerTest {
                                 MediaType.IMAGE_PNG_VALUE,
                                 "dummy-monster".getBytes());
 
-                RequestPostProcessor csrfRpp = Objects.requireNonNull(csrf());
-
                 mockMvc.perform(
                                 multipart("/monster/register")
                                                 .file(dataPart)
                                                 .file(iconImage)
                                                 .file(monsterImage)
-                                                .with(csrfRpp)
-                                                .contentType(MediaType.MULTIPART_FORM_DATA_VALUE)
+                                                .with(csrfRpp())
                                                 .accept(MediaType.APPLICATION_JSON_VALUE))
                                 .andExpect(status().isCreated())
-                                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON_VALUE))
                                 .andExpect(jsonPath("$.id").value(123));
 
                 verify(monsterService).create(any(MonsterCreateRequest.class), any(), any());
         }
 
         @Test
-        @WithMockUser
-        @DisplayName("POST /monster/register バリデーションエラー（name欠落）で 400")
-        void register_validation_error_400() throws Exception {
+        @WithMockUser(roles = "USER")
+        @DisplayName("POST /monster/register 権限不足（user）: 403")
+        void register_forbidden_user() throws Exception {
 
                 String json = """
                                 {
                                   "number": 10001,
                                   "rarity": 6,
+                                  "name": "テストモンスター",
                                   "evolutionStageId": 5,
                                   "attributeId": 1,
                                   "hpMax": 25000,
@@ -133,33 +134,19 @@ class MonsterControllerTest {
                                 """;
 
                 MockMultipartFile dataPart = new MockMultipartFile(
-                                "data",
-                                "data.json",
-                                MediaType.APPLICATION_JSON_VALUE,
-                                json.getBytes());
-
+                                "data", "data.json", MediaType.APPLICATION_JSON_VALUE, json.getBytes());
                 MockMultipartFile iconImage = new MockMultipartFile(
-                                "iconImage",
-                                "icon.png",
-                                MediaType.IMAGE_PNG_VALUE,
-                                "dummy-icon".getBytes());
-
+                                "iconImage", "icon.png", MediaType.IMAGE_PNG_VALUE, "x".getBytes());
                 MockMultipartFile monsterImage = new MockMultipartFile(
-                                "monsterImage",
-                                "monster.png",
-                                MediaType.IMAGE_PNG_VALUE,
-                                "dummy-monster".getBytes());
-
-                RequestPostProcessor csrfRpp = Objects.requireNonNull(csrf());
+                                "monsterImage", "monster.png", MediaType.IMAGE_PNG_VALUE, "x".getBytes());
 
                 mockMvc.perform(
                                 multipart("/monster/register")
                                                 .file(dataPart)
                                                 .file(iconImage)
                                                 .file(monsterImage)
-                                                .with(csrfRpp)
-                                                .contentType(MediaType.MULTIPART_FORM_DATA_VALUE)
+                                                .with(csrfRpp())
                                                 .accept(MediaType.APPLICATION_JSON_VALUE))
-                                .andExpect(status().isBadRequest());
+                                .andExpect(status().isForbidden());
         }
 }

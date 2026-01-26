@@ -4,34 +4,35 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
-@EnableWebSecurity
+@EnableMethodSecurity // @PreAuthorize を有効化
 public class SecurityConfig {
 
     @Bean
-    public BCryptPasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
-    @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
-                .formLogin(form -> form.disable())
-                .httpBasic(basic -> basic.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .cors(Customizer.withDefaults())
+                // 既存テストで csrf() を使っているなら有効のままでOK
+                .csrf(Customizer.withDefaults())
+
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/health").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/user/login").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/user/register").permitAll()
+                        // ---- 公開（認証不要） ----
+                        .requestMatchers("/health").permitAll()
+                        .requestMatchers("/user/login", "/user/register").permitAll()
+
+                        // 重要：モンスター閲覧系は公開
+                        .requestMatchers(HttpMethod.GET, "/monster/select/all").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/monster/select/*").permitAll()
+
+                        // ---- それ以外は admin 必須 ----
+                        .requestMatchers("/monster/**").hasRole("ADMIN")
+                        .requestMatchers("/master/**").hasRole("ADMIN")
+
+                        // その他（将来用）
                         .anyRequest().authenticated());
 
         return http.build();
