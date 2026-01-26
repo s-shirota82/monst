@@ -13,9 +13,11 @@ import java.util.Set;
 import java.util.UUID;
 
 import lombok.NonNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class MonsterService {
@@ -23,9 +25,7 @@ public class MonsterService {
     private final MonsterRepository monsterRepository;
     private final MasterRepository masterRepository;
 
-    // uploads/monsters が基点
     private static final @NonNull Path IMAGE_ROOT = Paths.get("uploads", "monsters");
-
     private static final Set<String> ALLOWED_EXT = Set.of("png", "jpg", "jpeg", "webp");
 
     public MonsterService(
@@ -41,16 +41,10 @@ public class MonsterService {
             @NonNull MultipartFile iconImage,
             @NonNull MultipartFile monsterImage) {
 
-        // =========================
-        // 重複チェック
-        // =========================
         if (monsterRepository.existsByNumber(req.getNumber())) {
             throw new BadRequestException("number is already registered: " + req.getNumber());
         }
 
-        // =========================
-        // マスタ存在チェック
-        // =========================
         mustExist("rarity_master", "rarity", req.getRarity(), "rarity");
         mustExist("evolution_stage_master", "id", req.getEvolutionStageId(), "evolutionStageId");
         mustExist("attribute_master", "id", req.getAttributeId(), "attributeId");
@@ -68,47 +62,79 @@ public class MonsterService {
             mustExist("assist_skill_master", "id", req.getAssistSkillId(), "assistSkillId");
         }
         if (req.getSubFriendshipComboId() != null) {
-            mustExist(
-                    "sub_friendship_combo_name_master",
-                    "id",
-                    req.getSubFriendshipComboId(),
-                    "subFriendshipComboId");
+            mustExist("sub_friendship_combo_name_master", "id", req.getSubFriendshipComboId(), "subFriendshipComboId");
         }
         if (req.getSeriesInfoId() != null) {
             mustExist("series_info_master", "id", req.getSeriesInfoId(), "seriesInfoId");
         }
 
-        mustExist(
-                "strike_shot_name_master",
-                "id",
-                req.getStrikeShotNameId(),
-                "strikeShotNameId");
-        mustExist(
-                "strike_shot_effect_master",
-                "id",
-                req.getStrikeShotEffectId(),
-                "strikeShotEffectId");
-        mustExist(
-                "sub_friendship_combo_name_master",
-                "id",
-                req.getFriendshipComboId(),
-                "friendshipComboId");
+        mustExist("strike_shot_name_master", "id", req.getStrikeShotNameId(), "strikeShotNameId");
+        mustExist("strike_shot_effect_master", "id", req.getStrikeShotEffectId(), "strikeShotEffectId");
+        mustExist("sub_friendship_combo_name_master", "id", req.getFriendshipComboId(), "friendshipComboId");
 
-        // =========================
-        // 画像保存
-        // =========================
         String iconPath = saveImage(iconImage, "icon");
         String monsterPath = saveImage(monsterImage, "monster");
 
-        // =========================
-        // DB 登録
-        // =========================
         return monsterRepository.insert(req, iconPath, monsterPath);
     }
 
-    /**
-     * マスタ存在チェック（Service 層の責務）
-     */
+    @Transactional
+    public long update(
+            long id,
+            @NonNull MonsterCreateRequest req,
+            MultipartFile iconImage,
+            MultipartFile monsterImage) {
+        if (!monsterRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Monster not found: " + id);
+        }
+
+        // create と同じ整合性チェック
+        mustExist("rarity_master", "rarity", req.getRarity(), "rarity");
+        mustExist("evolution_stage_master", "id", req.getEvolutionStageId(), "evolutionStageId");
+        mustExist("attribute_master", "id", req.getAttributeId(), "attributeId");
+        mustExist("hit_type_master", "id", req.getHitTypeId(), "hitTypeId");
+        mustExist("tribe_master", "id", req.getTribeId(), "tribeId");
+        mustExist("battle_type_master", "id", req.getBattleTypeId(), "battleTypeId");
+
+        if (req.getLuckSkillId() != null) {
+            mustExist("luck_skill_master", "id", req.getLuckSkillId(), "luckSkillId");
+        }
+        if (req.getShotSkillId() != null) {
+            mustExist("shot_skill_master", "id", req.getShotSkillId(), "shotSkillId");
+        }
+        if (req.getAssistSkillId() != null) {
+            mustExist("assist_skill_master", "id", req.getAssistSkillId(), "assistSkillId");
+        }
+        if (req.getSubFriendshipComboId() != null) {
+            mustExist("sub_friendship_combo_name_master", "id", req.getSubFriendshipComboId(), "subFriendshipComboId");
+        }
+        if (req.getSeriesInfoId() != null) {
+            mustExist("series_info_master", "id", req.getSeriesInfoId(), "seriesInfoId");
+        }
+
+        mustExist("strike_shot_name_master", "id", req.getStrikeShotNameId(), "strikeShotNameId");
+        mustExist("strike_shot_effect_master", "id", req.getStrikeShotEffectId(), "strikeShotEffectId");
+        mustExist("sub_friendship_combo_name_master", "id", req.getFriendshipComboId(), "friendshipComboId");
+
+        var currentPaths = monsterRepository.findImagePathsById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Monster not found: " + id));
+
+        String iconPath = (iconImage != null && !iconImage.isEmpty())
+                ? saveImage(iconImage, "icon")
+                : currentPaths.iconImage();
+
+        String monsterPath = (monsterImage != null && !monsterImage.isEmpty())
+                ? saveImage(monsterImage, "monster")
+                : currentPaths.monsterImage();
+
+        int updated = monsterRepository.update(id, req, iconPath, monsterPath);
+        if (updated != 1) {
+            throw new IllegalStateException("Failed to update monster. id=" + id);
+        }
+
+        return id;
+    }
+
     private void mustExist(
             @NonNull String table,
             @NonNull String column,
@@ -119,12 +145,10 @@ public class MonsterService {
         }
     }
 
-    /**
-     * 画像保存（uploads/monsters/{icon|monster}/）
-     */
     private @NonNull String saveImage(
             @NonNull MultipartFile file,
             @NonNull String type) {
+
         if (file.isEmpty()) {
             throw new BadRequestException(type + " image is empty");
         }
@@ -140,9 +164,7 @@ public class MonsterService {
 
             String filename = type + "_" + UUID.randomUUID() + "." + ext;
 
-            Path resolved = dir.resolve(filename);
-            Path target = Objects.requireNonNull(resolved, "resolved image path must not be null");
-
+            Path target = Objects.requireNonNull(dir.resolve(filename), "resolved image path must not be null");
             file.transferTo(target);
 
             return "uploads/monsters/" + type + "/" + filename;

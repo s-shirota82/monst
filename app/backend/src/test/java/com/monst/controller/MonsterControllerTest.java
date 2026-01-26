@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.util.Objects;
 
 import com.monst.dto.request.MonsterCreateRequest;
+import com.monst.service.MonsterFullQueryService;
 import com.monst.service.MonsterService;
 
 import org.junit.jupiter.api.DisplayName;
@@ -33,6 +34,10 @@ class MonsterControllerTest {
 
         @MockBean
         private MonsterService monsterService;
+
+        // ★ 追加：MonsterController の依存を満たすため
+        @MockBean
+        private MonsterFullQueryService monsterFullQueryService;
 
         @Test
         @WithMockUser
@@ -83,7 +88,6 @@ class MonsterControllerTest {
                                 MediaType.IMAGE_PNG_VALUE,
                                 "dummy-monster".getBytes());
 
-                // ★ Null type safety 対策（csrf）
                 RequestPostProcessor csrfRpp = Objects.requireNonNull(csrf());
 
                 mockMvc.perform(
@@ -146,7 +150,6 @@ class MonsterControllerTest {
                                 MediaType.IMAGE_PNG_VALUE,
                                 "dummy-monster".getBytes());
 
-                // ★ Null type safety 対策（csrf）
                 RequestPostProcessor csrfRpp = Objects.requireNonNull(csrf());
 
                 mockMvc.perform(

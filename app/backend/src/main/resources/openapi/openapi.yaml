@@ -1,10 +1,14 @@
 openapi: 3.0.3
 info:
   title: Monst API
-  version: 0.1.0
+  version: 0.2.0
   description: |
-    開発中のAPI仕様（health / login / register / monster register）。
-    エラーレスポンスは ControllerAdvice により統一されます。
+    開発中のAPI仕様。
+    - /health
+    - /user/login, /user/register
+    - /monster/* (register/update/select)
+    - /master/* (select/register/update + image upload)
+    エラーレスポンスは ControllerAdvice により統一されます（主に validation/unauthorized/conflict 等）。
 servers:
   - url: http://localhost:8080
     description: Local (Docker/WSL)
@@ -16,6 +20,8 @@ tags:
     description: ユーザー関連
   - name: Monster
     description: モンスター関連
+  - name: Master
+    description: マスタ関連
 
 paths:
   /health:
@@ -32,8 +38,7 @@ paths:
                 $ref: "#/components/schemas/HealthResponse"
               examples:
                 ok:
-                  value:
-                    ok: true
+                  value: { ok: true }
 
   /user/login:
     post:
@@ -48,53 +53,29 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
+            schema: { $ref: "#/components/schemas/LoginRequest" }
             examples:
               valid:
-                value:
-                  email: test@example.com
-                  password: Abcd1234
+                value: { email: test@example.com, password: Abcd1234 }
       responses:
         "200":
           description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/LoginResponse"
+              schema: { $ref: "#/components/schemas/LoginResponse" }
               examples:
                 ok:
-                  value:
-                    id: 1
-                    email: test@example.com
+                  value: { id: 1, email: test@example.com }
         "400":
           description: Bad Request (validation error)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                validationError:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Validation failed
-                    details:
-                      - field: email
-                        message: email must be a valid email address
-                      - field: password
-                        message: password must be 8-50 chars, contain letters and numbers, and include at least one uppercase letter
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "401":
           description: Unauthorized (invalid credentials)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                unauthorized:
-                  value:
-                    code: UNAUTHORIZED
-                    message: Invalid email or password
-                    details: []
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /user/register:
     post:
@@ -109,182 +90,354 @@ paths:
         required: true
         content:
           application/json:
-            schema:
-              $ref: "#/components/schemas/RegisterRequest"
+            schema: { $ref: "#/components/schemas/RegisterRequest" }
             examples:
               valid:
-                value:
-                  email: test@example.com
-                  password: Abcd1234
-                  name: test
+                value: { email: test@example.com, password: Abcd1234, name: test }
       responses:
         "201":
           description: Created
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/RegisterResponse"
+              schema: { $ref: "#/components/schemas/RegisterResponse" }
               examples:
                 created:
-                  value:
-                    id: 1
-                    email: test@example.com
-                    name: test
+                  value: { id: 1, email: test@example.com, name: test }
         "400":
           description: Bad Request (validation error)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                validationError:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Validation failed
-                    details:
-                      - field: email
-                        message: email must be a valid email address
-                      - field: password
-                        message: password must be 8-50 chars, contain letters and numbers, and include at least one uppercase letter
-                      - field: name
-                        message: name is required
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
         "409":
           description: Conflict (email already used)
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                conflict:
-                  value:
-                    code: EMAIL_ALREADY_USED
-                    message: Email already used
-                    details: []
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
 
   /monster/register:
     post:
       tags: [Monster]
-      summary: Register Monster
+      summary: Register monster
       description: |
-        モンスターを登録します（画像2枚 + JSON）。
-        - 認証: 必要（Spring Security）
-        - CSRF: 必要（Cookie/Session運用の場合）
-        - validation NG: 400（ErrorResponse）
+        モンスター登録（multipart/form-data）。
+        - data: JSON（MonsterCreateRequest）
+        - iconImage: 画像ファイル
+        - monsterImage: 画像ファイル
       operationId: registerMonster
-      security:
-        - cookieAuth: []
       requestBody:
         required: true
         content:
           multipart/form-data:
             schema:
-              $ref: "#/components/schemas/MonsterRegisterMultipartRequest"
-            encoding:
-              data:
-                contentType: application/json
-              iconImage:
-                contentType: image/png, image/jpeg, image/webp
-              monsterImage:
-                contentType: image/png, image/jpeg, image/webp
-            examples:
-              example:
-                summary: multipart example (data + files)
-                value:
-                  data:
-                    number: 10001
-                    rarity: 6
-                    name: テストモンスター
-                    evolutionStageId: 5
-                    attributeId: 1
-                    hpMax: 25000
-                    hpPlusMax: 27500
-                    attackMax: 28000
-                    attackPlusMax: 31000
-                    speedMax: 350.123
-                    speedPlusMax: 380.456
-                    hitTypeId: 1
-                    tribeId: 13
-                    battleTypeId: 2
-                    strikeShotNameId: 1
-                    strikeShotEffectId: 1
-                    friendshipComboId: 100
-                    specialNote: 0
-                  iconImage: (binary)
-                  monsterImage: (binary)
+              type: object
+              required: [data, iconImage, monsterImage]
+              properties:
+                data:
+                  type: string
+                  description: MonsterCreateRequest JSON文字列
+                iconImage:
+                  type: string
+                  format: binary
+                monsterImage:
+                  type: string
+                  format: binary
       responses:
         "201":
           description: Created
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/MonsterRegisterResponse"
-              examples:
-                created:
-                  value:
-                    id: 123
+              schema: { $ref: "#/components/schemas/MonsterCreateResponse" }
         "400":
-          description: Bad Request (validation error)
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /monster/update/{id}:
+    put:
+      tags: [Monster]
+      summary: Update monster
+      description: |
+        モンスター更新（multipart/form-data）。
+        - data: JSON（MonsterCreateRequest）
+        - iconImage/monsterImage は任意（未指定の場合は既存維持の実装想定）
+      operationId: updateMonster
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+                  description: MonsterCreateRequest JSON文字列
+                iconImage:
+                  type: string
+                  format: binary
+                monsterImage:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterUpdateResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /monster/select/all:
+    get:
+      tags: [Monster]
+      summary: Get monster list (full response)
+      description: |
+        モンスター一覧（詳細レスポンス形式）を返します。
+        includeImages=true の場合、base64 を含めて返します（レスポンスが大きくなる点に注意）。
+      operationId: getMonsterFullList
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: 名前の部分一致
+        - name: rarity
+          in: query
+          schema: { type: integer }
+        - name: attributeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: tribeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: battleTypeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: includeImages
+          in: query
+          schema: { type: boolean, default: false }
+          description: true の場合、ImageData.base64 を含める
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterFullListResponse" }
+
+  /monster/select/{id}:
+    get:
+      tags: [Monster]
+      summary: Get monster detail (full response)
+      description: |
+        モンスター詳細（内容展開版）を返します。
+        画像は base64 を含めて返します（実装側が常に includeImages=true 相当で返す想定）。
+      operationId: getMonsterFullDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterFullResponse" }
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/select/all:
+    get:
+      tags: [Master]
+      summary: Select master list
+      description: |
+        マスタ一覧を取得します。
+        type は実装のホワイトリストに依存（例: attribute, luckSkill, friendshipName, ...）。
+      operationId: selectMasterAll
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                validationError:
-                  value:
-                    code: VALIDATION_ERROR
-                    message: Validation failed
-                    details:
-                      - field: name
-                        message: name is required
-        "401":
-          description: Unauthorized
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+
+  /master/{type}/register:
+    post:
+      tags: [Master]
+      summary: Register master (JSON)
+      description: |
+        マスタ追加（JSON）。
+        画像を含める場合は register-with-image を使用。
+      operationId: registerMaster
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                unauthorized:
-                  value:
-                    code: UNAUTHORIZED
-                    message: Unauthorized
-                    details: []
-        "403":
-          description: Forbidden (CSRF or access denied)
+              schema: { $ref: "#/components/schemas/IdResponse" }
+
+  /master/{type}/update/{id}:
+    put:
+      tags: [Master]
+      summary: Update master (JSON)
+      description: |
+        マスタ更新（JSON）。
+        画像を含める場合は update-with-image を使用。
+      operationId: updateMaster
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: OK
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                forbidden:
-                  value:
-                    code: FORBIDDEN
-                    message: Forbidden
-                    details: []
-        "500":
-          description: Internal Server Error
+              schema: { $ref: "#/components/schemas/IdResponse" }
+
+  /master/{type}/register-with-image:
+    post:
+      tags: [Master]
+      summary: Register master (multipart with image)
+      description: |
+        画像付きマスタ追加（multipart/form-data）。
+        - data: JSON文字列
+        - image: 画像ファイル
+        対象: attribute / luckSkill / friendshipName など（実装の supportsImage=true の type）
+      operationId: registerMasterWithImage
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data, image]
+              properties:
+                data:
+                  type: string
+                  description: master JSON文字列
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
           content:
             application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-              examples:
-                unexpected:
-                  value:
-                    code: INTERNAL_SERVER_ERROR
-                    message: Unexpected error occurred
-                    details: []
+              schema: { $ref: "#/components/schemas/IdResponse" }
+
+  /master/{type}/update-with-image/{id}:
+    put:
+      tags: [Master]
+      summary: Update master (multipart with image)
+      description: |
+        画像付きマスタ更新（multipart/form-data）。
+        - data: JSON文字列
+        - image: 任意
+      operationId: updateMasterWithImage
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+                  description: master JSON文字列
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdResponse" }
 
 components:
-  securitySchemes:
-    cookieAuth:
-      type: apiKey
-      in: cookie
-      name: JSESSIONID
-      description: |
-        セッションベース認証（例: JSESSIONID）。
-        実際の認証方式に合わせて変更してください。
-
   schemas:
-    # ---------- Success ----------
+    # ---------- Common ----------
+    IdResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    # ---------- Health ----------
     HealthResponse:
       type: object
       additionalProperties: false
@@ -294,6 +447,7 @@ components:
           type: boolean
           example: true
 
+    # ---------- User ----------
     LoginResponse:
       type: object
       additionalProperties: false
@@ -325,17 +479,6 @@ components:
           type: string
           example: test
 
-    MonsterRegisterResponse:
-      type: object
-      additionalProperties: false
-      required: [id]
-      properties:
-        id:
-          type: integer
-          format: int64
-          example: 123
-
-    # ---------- Requests ----------
     LoginRequest:
       type: object
       additionalProperties: false
@@ -344,12 +487,10 @@ components:
         email:
           type: string
           format: email
-          description: メールアドレス形式
           example: test@example.com
         password:
           type: string
           format: password
-          description: 8〜50文字、英字+数字の混合、大文字を含む（英数字のみ）
           minLength: 8
           maxLength: 50
           pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
@@ -363,22 +504,67 @@ components:
         email:
           type: string
           format: email
-          description: メールアドレス形式
           example: test@example.com
         password:
           type: string
           format: password
-          description: 8〜50文字、英字+数字の混合、大文字を含む（英数字のみ）
           minLength: 8
           maxLength: 50
           pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
           example: Abcd1234
         name:
           type: string
-          description: 表示名
           minLength: 1
           maxLength: 50
           example: test
+
+    # ---------- Error (Unified) ----------
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          example: Validation failed
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          example: email
+        message:
+          type: string
+          example: email must be a valid email address
+
+    # ---------- Monster: create/update ----------
+    MonsterCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    MonsterUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
 
     MonsterCreateRequest:
       type: object
@@ -403,170 +589,253 @@ components:
         - friendshipComboId
         - specialNote
       properties:
-        number:
-          type: integer
-          example: 10001
-        rarity:
-          type: integer
-          example: 6
-        name:
-          type: string
-          example: テストモンスター
-        evolutionStageId:
-          type: integer
-          format: int64
-          example: 5
-        attributeId:
-          type: integer
-          format: int64
-          example: 1
-        hpMax:
-          type: integer
-          minimum: 0
-          example: 25000
-        hpPlusMax:
-          type: integer
-          minimum: 0
-          example: 27500
-        attackMax:
-          type: integer
-          minimum: 0
-          example: 28000
-        attackPlusMax:
-          type: integer
-          minimum: 0
-          example: 31000
-        speedMax:
-          type: number
-          format: double
-          example: 350.123
-        speedPlusMax:
-          type: number
-          format: double
-          example: 380.456
-        luckSkillId:
-          type: integer
-          format: int64
-          nullable: true
-          example: 1
-        hitTypeId:
-          type: integer
-          format: int64
-          example: 1
-        tribeId:
-          type: integer
-          format: int64
-          example: 13
-        battleTypeId:
-          type: integer
-          format: int64
-          example: 2
+        number: { type: integer }
+        rarity: { type: integer }
+        name: { type: string }
+        evolutionStageId: { type: integer, format: int64 }
+        attributeId: { type: integer, format: int64 }
+        hpMax: { type: integer }
+        hpPlusMax: { type: integer }
+        attackMax: { type: integer }
+        attackPlusMax: { type: integer }
+        speedMax: { type: number, format: double }
+        speedPlusMax: { type: number, format: double }
+        luckSkillId: { type: integer, format: int64, nullable: true }
+        hitTypeId: { type: integer, format: int64 }
+        tribeId: { type: integer, format: int64 }
+        battleTypeId: { type: integer, format: int64 }
         baseAbility:
-          description: 任意JSON（配列/オブジェクト可）
+          type: object
           nullable: true
-          oneOf:
-            - type: array
-              items: {}
-            - type: object
+          description: JSON（実装依存）
         gaugeAbility:
-          description: 任意JSON（配列/オブジェクト可）
+          type: object
           nullable: true
-          oneOf:
-            - type: array
-              items: {}
-            - type: object
+          description: JSON（実装依存）
         connectSkill:
-          description: 任意JSON（配列/オブジェクト可）
+          type: object
           nullable: true
-          oneOf:
-            - type: array
-              items: {}
-            - type: object
-        shotSkillId:
-          type: integer
-          format: int64
-          nullable: true
-          example: 1
-        assistSkillId:
-          type: integer
-          format: int64
-          nullable: true
-          example: 1
-        strikeShotNameId:
-          type: integer
-          format: int64
-          example: 1
-        strikeShotEffectId:
-          type: integer
-          format: int64
-          example: 1
-        friendshipComboId:
-          type: integer
-          format: int64
-          example: 100
-        subFriendshipComboId:
-          type: integer
-          format: int64
-          nullable: true
-          example: null
-        specialNote:
-          type: integer
-          example: 0
-        seriesInfoId:
-          type: integer
-          format: int64
-          nullable: true
-          example: 1
+          description: JSON（実装依存）
+        shotSkillId: { type: integer, format: int64, nullable: true }
+        assistSkillId: { type: integer, format: int64, nullable: true }
+        strikeShotNameId: { type: integer, format: int64 }
+        strikeShotEffectId: { type: integer, format: int64 }
+        friendshipComboId: { type: integer, format: int64 }
+        subFriendshipComboId: { type: integer, format: int64, nullable: true }
+        specialNote: { type: integer }
+        seriesInfoId: { type: integer, format: int64, nullable: true }
 
-    MonsterRegisterMultipartRequest:
+    # ---------- Monster: full response ----------
+    MonsterFullListResponse:
       type: object
       additionalProperties: false
-      required: [data, iconImage, monsterImage]
+      required: [items, page, size, total]
       properties:
-        data:
-          $ref: "#/components/schemas/MonsterCreateRequest"
-        iconImage:
-          type: string
-          format: binary
-          description: アイコン画像（png/jpg/webp）
-        monsterImage:
-          type: string
-          format: binary
-          description: モンスター画像（png/jpg/webp）
-
-    # ---------- Error (Unified) ----------
-    ErrorResponse:
-      type: object
-      additionalProperties: false
-      required: [code, message, details]
-      properties:
-        code:
-          type: string
-          description: |
-            エラー種別コード。
-            - VALIDATION_ERROR
-            - UNAUTHORIZED
-            - EMAIL_ALREADY_USED
-            - INTERNAL_SERVER_ERROR
-            - FORBIDDEN
-          example: VALIDATION_ERROR
-        message:
-          type: string
-          example: Validation failed
-        details:
+        items:
           type: array
-          description: validation の場合のみ field/message を返す。その他は空配列。
-          items:
-            $ref: "#/components/schemas/ErrorDetail"
+          items: { $ref: "#/components/schemas/MonsterFullResponse" }
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
 
-    ErrorDetail:
+    MonsterFullResponse:
       type: object
       additionalProperties: false
-      required: [field, message]
+      required:
+        - id
+        - number
+        - name
+        - rarity
+        - evolutionStage
+        - attribute
+        - hitType
+        - tribe
+        - battleType
+        - status
+        - abilities
+        - connectSkill
+        - skills
+        - strikeShot
+        - friendshipCombo
+        - images
       properties:
-        field:
+        id: { type: integer, format: int64 }
+        number: { type: integer }
+        name: { type: string }
+
+        rarity: { $ref: "#/components/schemas/MonsterRarity" }
+        evolutionStage: { $ref: "#/components/schemas/MonsterEvolutionStage" }
+
+        attribute: { $ref: "#/components/schemas/NamedImage" }
+        hitType: { type: string }
+        tribe: { type: string }
+        battleType: { type: string }
+
+        status: { $ref: "#/components/schemas/MonsterStatus" }
+
+        luckSkill:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/NamedImage"
+
+        abilities: { $ref: "#/components/schemas/MonsterAbilities" }
+        connectSkill: { $ref: "#/components/schemas/MonsterConnectSkill" }
+        skills: { $ref: "#/components/schemas/MonsterSkills" }
+        strikeShot: { $ref: "#/components/schemas/MonsterStrikeShot" }
+        friendshipCombo: { $ref: "#/components/schemas/MonsterFriendshipCombo" }
+
+        series:
           type: string
-          example: email
-        message:
+          nullable: true
+
+        images: { $ref: "#/components/schemas/MonsterImages" }
+
+    ImageData:
+      type: object
+      additionalProperties: false
+      required: [path, mimeType, base64]
+      properties:
+        path:
           type: string
-          example: email must be a valid email address
+          description: サーバ上の相対パス
+        mimeType:
+          type: string
+          nullable: true
+          example: image/png
+        base64:
+          type: string
+          nullable: true
+          description: includeImages=true のときのみ値が入る（詳細は常に入る想定）
+
+    NamedImage:
+      type: object
+      additionalProperties: false
+      required: [name, image]
+      properties:
+        name: { type: string }
+        image: { $ref: "#/components/schemas/ImageData" }
+
+    MonsterRarity:
+      type: object
+      additionalProperties: false
+      required: [value, maxLevel]
+      properties:
+        value: { type: integer }
+        maxLevel: { type: integer }
+
+    MonsterEvolutionStage:
+      type: object
+      additionalProperties: false
+      required: [name, levelCapRelease, superBattleRelease]
+      properties:
+        name: { type: string }
+        levelCapRelease: { type: boolean }
+        superBattleRelease: { type: boolean }
+
+    MonsterStatus:
+      type: object
+      additionalProperties: false
+      required: [hp, attack, speed]
+      properties:
+        hp: { $ref: "#/components/schemas/MonsterStat" }
+        attack: { $ref: "#/components/schemas/MonsterStat" }
+        speed: { $ref: "#/components/schemas/MonsterSpeed" }
+
+    MonsterStat:
+      type: object
+      additionalProperties: false
+      required: [max, plusMax]
+      properties:
+        max: { type: integer }
+        plusMax: { type: integer }
+
+    MonsterSpeed:
+      type: object
+      additionalProperties: false
+      required: [max, plusMax]
+      properties:
+        max: { type: number, format: double }
+        plusMax: { type: number, format: double }
+
+    MonsterAbilities:
+      type: object
+      additionalProperties: false
+      required: [base, gauge]
+      properties:
+        base:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+        gauge:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+
+    MonsterAbility:
+      type: object
+      additionalProperties: false
+      required: [name, stage]
+      properties:
+        name: { type: string }
+        stage:
+          type: string
+          nullable: true
+
+    MonsterConnectSkill:
+      type: object
+      additionalProperties: false
+      required: [condition, abilities]
+      properties:
+        condition:
+          type: string
+          nullable: true
+        abilities:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+
+    MonsterSkills:
+      type: object
+      additionalProperties: false
+      required: [shot, assist]
+      properties:
+        shot: { type: string, nullable: true }
+        assist: { type: string, nullable: true }
+
+    MonsterStrikeShot:
+      type: object
+      additionalProperties: false
+      required: [name, effect]
+      properties:
+        name: { type: string, nullable: true }
+        effect: { type: string, nullable: true }
+
+    MonsterFriendshipCombo:
+      type: object
+      additionalProperties: false
+      required: [main, sub]
+      properties:
+        main: { $ref: "#/components/schemas/MonsterFriendship" }
+        sub:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/MonsterFriendship"
+
+    MonsterFriendship:
+      type: object
+      additionalProperties: false
+      required: [name, attribute, category, description, power, image]
+      properties:
+        name: { type: string }
+        attribute: { $ref: "#/components/schemas/NamedImage" }
+        category: { type: string }
+        description: { type: string }
+        power:
+          type: integer
+          nullable: true
+        image: { $ref: "#/components/schemas/ImageData" }
+
+    MonsterImages:
+      type: object
+      additionalProperties: false
+      required: [icon, monster]
+      properties:
+        icon: { $ref: "#/components/schemas/ImageData" }
+        monster: { $ref: "#/components/schemas/ImageData" }
