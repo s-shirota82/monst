@@ -12,11 +12,11 @@ import org.springframework.stereotype.Repository;
  * - Service側で固定値のみ渡す運用にする
  */
 @Repository
-public class MasterRepository {
+public class MasterExistenceRepository {
 
     private final JdbcTemplate jdbcTemplate;
 
-    public MasterRepository(JdbcTemplate jdbcTemplate) {
+    public MasterExistenceRepository(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -36,13 +36,11 @@ public class MasterRepository {
 
     /**
      * 任意カラムで存在チェック（Service側から固定の table/column を渡す前提）
-     *
-     * @param table  テーブル名（固定値のみ渡す）
-     * @param column カラム名（固定値のみ渡す）
-     * @param value  値
      */
-    public boolean existsByValue(@NonNull String table, @NonNull String column, @NonNull Object value) {
-        // table/column はプレースホルダにできないため、外部入力を渡さない運用が必須
+    public boolean existsByValue(
+            @NonNull String table,
+            @NonNull String column,
+            @NonNull Object value) {
         String sql = "SELECT COUNT(*) FROM " + table + " WHERE " + column + " = ?";
         Integer count = jdbcTemplate.queryForObject(sql, Integer.class, value);
         return count != null && count > 0;

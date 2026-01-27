@@ -1,753 +1,275 @@
 "use client"
 
-import { Card } from "@/components/ui/card"
-import { SiteHeader } from "@/components/site-header"
-import { Button } from "@/components/ui/button"
-import { Flame, Droplet, Zap, Leaf, ChevronLeft, ChevronRight, Search } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useState, useMemo } from "react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { SiteHeader } from "@/components/site-header"
+import { Card } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ChevronLeft, ChevronRight, Search } from "lucide-react"
 
-// モンスターのタイプを定義
-const elementIcons = {
-  fire: { icon: Flame, color: "text-red-500" },
-  water: { icon: Droplet, color: "text-blue-500" },
-  thunder: { icon: Zap, color: "text-yellow-500" },
-  wood: { icon: Leaf, color: "text-green-500" },
+import { fetchMonsterList } from "@/lib/monsters-api"
+import type { MonsterFullResponse } from "@/lib/types"
+import { ApiError } from "@/lib/api-client"
+import { useAuth } from "@/lib/auth-context"
+
+function imageSrc(img: { mimeType: string | null; base64: string | null; path: string } | null | undefined) {
+  if (!img) return null
+  if (img.base64 && img.mimeType) return `data:${img.mimeType};base64,${img.base64}`
+  return null
 }
 
-const races = ["神族", "ドラゴン族", "獣族", "魔族", "妖精族"]
-const battleTypes = ["バランス", "スピード", "パワー"]
-const abilities = [
-  "火属性ダメージ軽減",
-  "水属性ダメージ軽減",
-  "雷属性ダメージ軽減",
-  "木属性ダメージ軽減",
-  "アンチワープ",
-  "アンチ減速壁",
+// 所持キャラ（モックでOK）
+const OWNED_MOCK = [
+  { id: "m1", number: 90001, name: "所持モンスターA", img: "/monster-character.jpg" },
+  { id: "m2", number: 90002, name: "所持モンスターB", img: "/monster-.jpg" },
+  { id: "m3", number: 90003, name: "所持モンスターC", img: "/game-monster-creature-no.jpg" },
 ]
-const friendshipCombos = ["貫通", "ホーミング", "レーザー", "十字レーザー", "爆発", "ワンウェイレーザー"]
-const evolutionStages = ["2段階", "3段階"]
-const seriesList = ["神獣シリーズ", "英雄シリーズ", "三国志シリーズ", "ドラゴンシリーズ", "コラボシリーズ"]
 
-const generateMonsters = () => {
-  const elements = ["fire", "water", "thunder", "wood"] as const
+const ATTRIBUTE_OPTIONS: { label: string; id: number }[] = [
+  { label: "火", id: 1 },
+  { label: "水", id: 2 },
+  { label: "木", id: 3 },
+  { label: "光", id: 4 },
+  { label: "闇", id: 5 },
+  { label: "無", id: 6 },
+]
 
-  const monsters = []
-
-  for (let i = 1; i <= 9000; i++) {
-    monsters.push({
-      id: i,
-      dexNo: String(i).padStart(4, "0"),
-      name: `モンスター${i}`,
-      element: elements[Math.floor(Math.random() * elements.length)],
-      rarity: Math.floor(Math.random() * 2) + 4, // 4 or 5
-      type: battleTypes[Math.floor(Math.random() * battleTypes.length)],
-      race: races[Math.floor(Math.random() * races.length)],
-      evolution: evolutionStages[Math.floor(Math.random() * evolutionStages.length)],
-      ability: abilities[Math.floor(Math.random() * abilities.length)],
-      gaugeAbility: Math.random() > 0.5 ? abilities[Math.floor(Math.random() * abilities.length)] : null,
-      connectSkill: Math.random() > 0.5 ? abilities[Math.floor(Math.random() * abilities.length)] : null,
-      friendshipCombo: friendshipCombos[Math.floor(Math.random() * friendshipCombos.length)],
-      series: seriesList[Math.floor(Math.random() * seriesList.length)],
-      strikeShot: `ストライクショット${i}`,
-      shotSkill: `ショットスキル${i}`,
-      assistSkill: `アシストスキル${i}`,
-      owned: Math.random() > 0.7,
-    })
-  }
-
-  return monsters
-}
-
-const allMonsters = generateMonsters()
-const ALL_ITEMS_PER_PAGE = 300
-const OWNED_ITEMS_PER_PAGE = 300
+const RARITY_OPTIONS = ["1", "2", "3", "4", "5", "6"]
 
 export default function MonstersPage() {
-  const [activeTab, setActiveTab] = useState("all")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [selectedElement, setSelectedElement] = useState<string | null>(null)
-  const [selectedRace, setSelectedRace] = useState<string | null>(null)
-  const [selectedType, setSelectedType] = useState<string | null>(null)
-  const [selectedRarity, setSelectedRarity] = useState<string | null>(null)
-  const [selectedAbilities, setSelectedAbilities] = useState<string[]>([])
-  const [selectedFriendshipCombo, setSelectedFriendshipCombo] = useState<string | null>(null)
-  const [selectedEvolution, setSelectedEvolution] = useState<string | null>(null)
-  const [selectedSeries, setSelectedSeries] = useState<string | null>(null)
+  const { user, isLoading: authLoading } = useAuth()
+  const isLoggedIn = !!user && !authLoading
 
-  const filteredMonsters = useMemo(() => {
-    let result = [...allMonsters]
+  const [tab, setTab] = useState<"all" | "owned">("all")
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(
-        (m) =>
-          m.name.toLowerCase().includes(query) ||
-          m.strikeShot.toLowerCase().includes(query) ||
-          m.shotSkill.toLowerCase().includes(query) ||
-          m.assistSkill.toLowerCase().includes(query),
-      )
-    }
+  // ログアウトしたら all に戻す
+  useEffect(() => {
+    if (!isLoggedIn && tab === "owned") setTab("all")
+  }, [isLoggedIn, tab])
 
-    if (selectedElement) {
-      result = result.filter((m) => m.element === selectedElement)
-    }
-    if (selectedRace) {
-      result = result.filter((m) => m.race === selectedRace)
-    }
-    if (selectedType) {
-      result = result.filter((m) => m.type === selectedType)
-    }
-    if (selectedRarity) {
-      result = result.filter((m) => m.rarity === Number.parseInt(selectedRarity))
-    }
-    if (selectedAbilities.length > 0) {
-      result = result.filter((m) => {
-        const monsterAbilities = [m.ability, m.gaugeAbility, m.connectSkill].filter(Boolean)
-        return selectedAbilities.every((selectedAbility) => monsterAbilities.includes(selectedAbility))
-      })
-    }
-    if (selectedFriendshipCombo) {
-      result = result.filter((m) => m.friendshipCombo === selectedFriendshipCombo)
-    }
-    if (selectedEvolution) {
-      result = result.filter((m) => m.evolution === selectedEvolution)
-    }
-    if (selectedSeries) {
-      result = result.filter((m) => m.series === selectedSeries)
-    }
+  // ここから下は既存の状態管理をそのまま
+  const [items, setItems] = useState<MonsterFullResponse[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(0)
+  const [size] = useState(20)
 
-    return result
-  }, [
-    searchQuery,
-    selectedElement,
-    selectedRace,
-    selectedType,
-    selectedRarity,
-    selectedAbilities,
-    selectedFriendshipCombo,
-    selectedEvolution,
-    selectedSeries,
-  ])
+  const [q, setQ] = useState("")
+  const [rarity, setRarity] = useState<string>("")
+  const [attributeId, setAttributeId] = useState<string>("")
 
-  const itemsPerPage = activeTab === "all" ? ALL_ITEMS_PER_PAGE : OWNED_ITEMS_PER_PAGE
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  const totalPages = Math.ceil(filteredMonsters.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentMonsters = filteredMonsters.slice(startIndex, endIndex)
+  const queryParams = useMemo(() => {
+    return {
+      q: q.trim() || undefined,
+      rarity: rarity ? Number(rarity) : undefined,
+      attributeId: attributeId ? Number(attributeId) : undefined,
+      page,
+      size,
+      includeImages: true,
+    }
+  }, [q, rarity, attributeId, page, size])
 
-  const handleFilterChange = () => {
-    setCurrentPage(1)
-  }
+  useEffect(() => {
+    // 所持タブ中はAPIを叩かない（モックのままでOK要件）
+    if (tab === "owned") return
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-    setCurrentPage(1)
-  }
-
-  const toggleAbility = (ability: string) => {
-    setSelectedAbilities((prev) => {
-      if (prev.includes(ability)) {
-        return prev.filter((a) => a !== ability)
+    let canceled = false
+    ;(async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const res = await fetchMonsterList(queryParams)
+        if (canceled) return
+        setItems(res.items)
+        setTotal(res.total)
+      } catch (e) {
+        if (canceled) return
+        if (e instanceof ApiError) setError(e.message)
+        else setError("Failed to load monsters")
+      } finally {
+        if (!canceled) setLoading(false)
       }
-      return [...prev, ability]
-    })
-    handleFilterChange()
-  }
-
-  const getPageNumbers = () => {
-    const pages = []
-    const maxVisible = 5
-
-    if (totalPages <= maxVisible) {
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i)
-      }
-    } else {
-      if (currentPage <= 3) {
-        pages.push(1, 2, 3, 4, "...", totalPages)
-      } else if (currentPage >= totalPages - 2) {
-        pages.push(1, "...", totalPages - 3, totalPages - 2, totalPages - 1, totalPages)
-      } else {
-        pages.push(1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages)
-      }
+    })()
+    return () => {
+      canceled = true
     }
+  }, [queryParams, tab])
 
-    return pages
-  }
-
-  const gridClasses =
-    "grid grid-cols-5 gap-2 sm:grid-cols-8 md:grid-cols-10 lg:grid-cols-12 xl:grid-cols-15 2xl:grid-cols-18"
+  const totalPages = Math.max(1, Math.ceil(total / size))
 
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader />
 
-      {/* Page Header */}
-      <section className="border-b border-border bg-muted/30 py-4 md:py-6">
-        <div className="container mx-auto max-w-7xl px-4">
-          <h1 className="text-balance text-3xl font-bold md:text-4xl lg:text-5xl">モンスター図鑑</h1>
-          <p className="mt-2 text-pretty text-muted-foreground md:text-lg">
-            全{allMonsters.length.toLocaleString()}体のモンスター情報をチェック
-          </p>
-        </div>
-      </section>
+      <main className="container mx-auto px-4 py-8">
+        <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">モンスター図鑑</h1>
+            <p className="text-sm text-muted-foreground">GET /monster/select/all から取得します。</p>
+          </div>
 
-      <section className="container mx-auto max-w-7xl px-4 pt-4">
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList>
-            <TabsTrigger value="all">全モンスター</TabsTrigger>
-            <TabsTrigger value="owned">所持キャラ</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="space-y-3 pt-3">
-            {/* Filters and Search */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="名前、ストライクショット、ショットスキル、アシストスキルで検索..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    handleFilterChange()
-                  }}
-                  className="pl-10"
-                />
-              </div>
-
-              {/* Element Filter */}
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">属性:</span>
-                  <Select
-                    value={selectedElement || "all"}
-                    onValueChange={(value) => {
-                      setSelectedElement(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="fire">
-                        <div className="flex items-center gap-2">
-                          <Flame className="h-3 w-3" />
-                          火属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="water">
-                        <div className="flex items-center gap-2">
-                          <Droplet className="h-3 w-3" />
-                          水属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="thunder">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-3 w-3" />
-                          雷属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="wood">
-                        <div className="flex items-center gap-2">
-                          <Leaf className="h-3 w-3" />
-                          木属性
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">種族:</span>
-                  <Select
-                    value={selectedRace || "all"}
-                    onValueChange={(value) => {
-                      setSelectedRace(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {races.map((race) => (
-                        <SelectItem key={race} value={race}>
-                          {race}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">戦型:</span>
-                  <Select
-                    value={selectedType || "all"}
-                    onValueChange={(value) => {
-                      setSelectedType(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {battleTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">レア度:</span>
-                  <Select
-                    value={selectedRarity || "all"}
-                    onValueChange={(value) => {
-                      setSelectedRarity(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[110px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="4">★4</SelectItem>
-                      <SelectItem value="5">★5</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">進化形態:</span>
-                  <Select
-                    value={selectedEvolution || "all"}
-                    onValueChange={(value) => {
-                      setSelectedEvolution(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {evolutionStages.map((stage) => (
-                        <SelectItem key={stage} value={stage}>
-                          {stage}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">友情コンボ:</span>
-                  <Select
-                    value={selectedFriendshipCombo || "all"}
-                    onValueChange={(value) => {
-                      setSelectedFriendshipCombo(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {friendshipCombos.map((combo) => (
-                        <SelectItem key={combo} value={combo}>
-                          {combo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">シリーズ:</span>
-                  <Select
-                    value={selectedSeries || "all"}
-                    onValueChange={(value) => {
-                      setSelectedSeries(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {seriesList.map((series) => (
-                        <SelectItem key={series} value={series}>
-                          {series}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium">アビリティ (複数選択可):</span>
-                <div className="flex flex-wrap gap-4">
-                  {abilities.map((ability) => (
-                    <div key={ability} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={ability}
-                        checked={selectedAbilities.includes(ability)}
-                        onCheckedChange={() => toggleAbility(ability)}
-                      />
-                      <Label htmlFor={ability} className="cursor-pointer text-sm">
-                        {ability}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              {filteredMonsters.length.toLocaleString()}体中 {startIndex + 1}-
-              {Math.min(endIndex, filteredMonsters.length)}体を表示
-            </p>
-          </TabsContent>
-
-          <TabsContent value="owned" className="space-y-3 pt-3">
-            {/* Same filters for owned tab */}
-            <div className="space-y-3">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="名前、ストライクショット、ショットスキル、アシストスキルで検索..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value)
-                    handleFilterChange()
-                  }}
-                  className="pl-10"
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">属性:</span>
-                  <Select
-                    value={selectedElement || "all"}
-                    onValueChange={(value) => {
-                      setSelectedElement(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="fire">
-                        <div className="flex items-center gap-2">
-                          <Flame className="h-3 w-3" />
-                          火属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="water">
-                        <div className="flex items-center gap-2">
-                          <Droplet className="h-3 w-3" />
-                          水属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="thunder">
-                        <div className="flex items-center gap-2">
-                          <Zap className="h-3 w-3" />
-                          雷属性
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="wood">
-                        <div className="flex items-center gap-2">
-                          <Leaf className="h-3 w-3" />
-                          木属性
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">種族:</span>
-                  <Select
-                    value={selectedRace || "all"}
-                    onValueChange={(value) => {
-                      setSelectedRace(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[150px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {races.map((race) => (
-                        <SelectItem key={race} value={race}>
-                          {race}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">戦型:</span>
-                  <Select
-                    value={selectedType || "all"}
-                    onValueChange={(value) => {
-                      setSelectedType(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {battleTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
-                          {type}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">レア度:</span>
-                  <Select
-                    value={selectedRarity || "all"}
-                    onValueChange={(value) => {
-                      setSelectedRarity(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[110px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      <SelectItem value="4">★4</SelectItem>
-                      <SelectItem value="5">★5</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">進化形態:</span>
-                  <Select
-                    value={selectedEvolution || "all"}
-                    onValueChange={(value) => {
-                      setSelectedEvolution(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[130px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {evolutionStages.map((stage) => (
-                        <SelectItem key={stage} value={stage}>
-                          {stage}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">友情コンボ:</span>
-                  <Select
-                    value={selectedFriendshipCombo || "all"}
-                    onValueChange={(value) => {
-                      setSelectedFriendshipCombo(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {friendshipCombos.map((combo) => (
-                        <SelectItem key={combo} value={combo}>
-                          {combo}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium">シリーズ:</span>
-                  <Select
-                    value={selectedSeries || "all"}
-                    onValueChange={(value) => {
-                      setSelectedSeries(value === "all" ? null : value)
-                      handleFilterChange()
-                    }}
-                  >
-                    <SelectTrigger className="w-[180px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">すべて</SelectItem>
-                      {seriesList.map((series) => (
-                        <SelectItem key={series} value={series}>
-                          {series}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <span className="text-sm font-medium">アビリティ (複数選択可):</span>
-                <div className="flex flex-wrap gap-4">
-                  {abilities.map((ability) => (
-                    <div key={ability} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`owned-${ability}`}
-                        checked={selectedAbilities.includes(ability)}
-                        onCheckedChange={() => toggleAbility(ability)}
-                      />
-                      <Label htmlFor={`owned-${ability}`} className="cursor-pointer text-sm">
-                        {ability}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <p className="text-sm text-muted-foreground">
-              {filteredMonsters.length.toLocaleString()}体中 {startIndex + 1}-
-              {Math.min(endIndex, filteredMonsters.length)}体を表示
-            </p>
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      {/* Monster Grid */}
-      <section className="container mx-auto max-w-7xl px-4 py-3">
-        <div className={gridClasses}>
-          {currentMonsters.map((monster) => {
-            const elementData = elementIcons[monster.element as keyof typeof elementIcons]
-            const ElementIcon = elementData.icon
-            const isGrayedOut = activeTab === "owned" && !monster.owned
-
-            return (
-              <Link key={monster.id} href={`/monsters/${monster.id}`}>
-                <Card
-                  className={`group cursor-pointer overflow-hidden transition-all hover:shadow-lg hover:border-primary flex flex-col gap-0 p-0 ${
-                    isGrayedOut ? "opacity-30" : ""
-                  }`}
-                >
-                  <div className="relative aspect-square bg-gradient-to-br from-muted to-muted/50">
-                    <img
-                      src={`/game-monster-creature-no.jpg?key=e93mf&height=${activeTab === "owned" ? "120" : "80"}&width=${activeTab === "owned" ? "120" : "80"}&query=game+monster+creature+no${monster.dexNo}`}
-                      alt={`No.${monster.dexNo}`}
-                      className="h-full w-full object-cover transition-transform group-hover:scale-110"
-                    />
-                    <div className="absolute left-1 top-1 rounded bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold backdrop-blur-sm">
-                      {monster.dexNo}
-                    </div>
-                    {/* <div className="absolute right-1 top-1 rounded-full bg-background/80 p-1 backdrop-blur-sm">
-                      <ElementIcon className={`h-3 w-3 ${elementData.color}`} />
-                    </div> */}
-                  </div>
-                  {/* ここが「各モンスターの下」 */}
-                  {activeTab === "owned" && (
-                    <div className="border-t border-border/60 px-1 py-0.5 text-center text-[10px] leading-none text-muted-foreground">
-                      1：☘5
-                    </div>
-                  )}
-                </Card>
-              </Link>
-            )
-          })}
-        </div>
-
-        <div className="mt-4 flex flex-col items-center gap-4">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-              前へ
+          {/* 追加：タブボタン（表示の仕方は変えず、ここだけ追加） */}
+          <div className="flex items-center gap-2">
+            <Button variant={tab === "all" ? "default" : "outline"} onClick={() => setTab("all")}>
+              全モンスター
             </Button>
+            {isLoggedIn && (
+              <Button variant={tab === "owned" ? "default" : "outline"} onClick={() => setTab("owned")}>
+                所持キャラ
+              </Button>
+            )}
+          </div>
+        </div>
 
-            {getPageNumbers().map((page, idx) =>
-              page === "..." ? (
-                <span key={`ellipsis-${idx}`} className="px-2 text-muted-foreground">
-                  ...
-                </span>
-              ) : (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setCurrentPage(page as number)}
-                  className="min-w-[40px]"
-                >
-                  {page}
-                </Button>
-              ),
+        {/* 所持キャラ（ログイン時のみタブ出現、表示内容はモック） */}
+        {tab === "owned" && (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {OWNED_MOCK.map((m) => (
+              <Card key={m.id} className="p-4 hover:shadow-md transition-shadow">
+                <div className="flex items-center gap-3">
+                  <div className="h-14 w-14 overflow-hidden rounded-md bg-muted flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={m.img} alt={m.name} className="h-full w-full object-cover" />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="text-sm text-muted-foreground">No.{m.number}</div>
+                    <div className="font-semibold truncate">{m.name}</div>
+                    <div className="text-xs text-muted-foreground">（モック表示）</div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* ここから下は既存の全モンスター表示を一切変更していない（tab==="all" で囲うだけ） */}
+        {tab === "all" && (
+          <>
+            {error && (
+              <div className="mb-6 rounded-md border p-4 text-sm">
+                <div className="font-semibold">エラー</div>
+                <div className="text-muted-foreground">{error}</div>
+              </div>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              次へ
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
+            <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  className="pl-8 w-[280px]"
+                  placeholder="名前で検索（q）"
+                  value={q}
+                  onChange={(e) => {
+                    setPage(0)
+                    setQ(e.target.value)
+                  }}
+                />
+              </div>
 
-          <p className="text-sm text-muted-foreground">
-            ページ {currentPage} / {totalPages.toLocaleString()}
-          </p>
-        </div>
-      </section>
+              <Select
+                value={rarity}
+                onValueChange={(v) => {
+                  setPage(0)
+                  setRarity(v === "all" ? "" : v)
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="レア度" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべて</SelectItem>
+                  {RARITY_OPTIONS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      ★{r}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-muted/50 py-4">
-        <div className="container mx-auto max-w-7xl px-4 text-center">
-          <div className="text-sm text-muted-foreground">
-            <p>© 2025 モンスト攻略サイト</p>
-            <p className="mt-2">当サイトはモンスターストライクの攻略情報を提供する非公式サイトです</p>
-          </div>
-        </div>
-      </footer>
+              <Select
+                value={attributeId}
+                onValueChange={(v) => {
+                  setPage(0)
+                  setAttributeId(v === "all" ? "" : v)
+                }}
+              >
+                <SelectTrigger className="w-[140px]">
+                  <SelectValue placeholder="属性" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">すべて</SelectItem>
+                  {ATTRIBUTE_OPTIONS.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)}>
+                      {a.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">{loading ? "Loading..." : `${total} 件`}</div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={page <= 0 || loading}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <div className="text-sm">
+                  {page + 1} / {totalPages}
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  disabled={page + 1 >= totalPages || loading}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map((m) => {
+                const iconSrc = imageSrc(m.images?.icon ?? null)
+                return (
+                  <Link key={m.id} href={`/monsters/${m.id}`} className="block">
+                    <Card className="p-4 hover:shadow-md transition-shadow">
+                      <div className="flex items-center gap-3">
+                        <div className="h-14 w-14 overflow-hidden rounded-md bg-muted flex items-center justify-center">
+                          {iconSrc ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={iconSrc} alt={m.name} className="h-full w-full object-cover" />
+                          ) : (
+                            <div className="text-xs text-muted-foreground">no image</div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
+                          <div className="text-sm text-muted-foreground">No.{m.number}</div>
+                          <div className="font-semibold truncate">{m.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {m.attribute?.name} / {m.tribe} / {m.battleType}
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                )
+              })}
+            </div>
+          </>
+        )}
+      </main>
     </div>
   )
 }

@@ -1,16 +1,23 @@
 "use client"
 
 import type React from "react"
-import { createContext, useContext, useState, useEffect } from "react"
+import { createContext, useContext, useEffect, useMemo, useState } from "react"
+import { apiFetch } from "./api-client"
+import type { LoginResponse } from "./types"
+
+type Role = "ADMIN" | "USER" | string | number
 
 interface User {
   id: string
-  username: string
   email: string
+  role?: Role
+  token?: string | null
 }
 
 interface AuthContextType {
   user: User | null
+  token: string | null
+  isAdmin: boolean
   login: (email: string, password: string) => Promise<boolean>
   logout: () => void
   isLoading: boolean
@@ -18,47 +25,66 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Mock user data
-const MOCK_USERS = [
-  { id: "1", username: "プレイヤー1", email: "user1@example.com", password: "password123" },
-  { id: "2", username: "プレイヤー2", email: "user2@example.com", password: "password123" },
-]
+const STORAGE_KEY = "monst_auth"
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Check localStorage for saved user
-    const savedUser = localStorage.getItem("user")
-    if (savedUser) {
-      setUser(JSON.parse(savedUser))
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw) as User
+        setUser(parsed)
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }, [])
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 800))
+    try {
+      const res = await apiFetch<LoginResponse>("/user/login", {
+        method: "POST",
+        body: JSON.stringify({ email, password }),
+      })
 
-    const foundUser = MOCK_USERS.find((u) => u.email === email && u.password === password)
+      const next: User = {
+        id: String(res.id),
+        email: res.email,
+        role: res.role,
+        token: (res as any).token ?? null,
+      }
 
-    if (foundUser) {
-      const userData = { id: foundUser.id, username: foundUser.username, email: foundUser.email }
-      setUser(userData)
-      localStorage.setItem("user", JSON.stringify(userData))
+      setUser(next)
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
       return true
+    } catch {
+      return false
     }
-
-    return false
   }
 
   const logout = () => {
     setUser(null)
-    localStorage.removeItem("user")
+    localStorage.removeItem(STORAGE_KEY)
   }
 
-  return <AuthContext.Provider value={{ user, login, logout, isLoading }}>{children}</AuthContext.Provider>
+  const token = user?.token ?? null
+
+  const isAdmin = useMemo(() => {
+    if (!user?.role) return false
+    if (typeof user.role === "string") return user.role.toUpperCase() === "ADMIN"
+    return false
+  }, [user?.role])
+
+  return (
+    <AuthContext.Provider value={{ user, token, isAdmin, login, logout, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  )
 }
 
 export function useAuth() {

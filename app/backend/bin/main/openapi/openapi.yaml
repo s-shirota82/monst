@@ -1,0 +1,820 @@
+openapi: 3.0.3
+info:
+  title: Monst API
+  version: 0.3.0
+  description: |
+    Monst API.
+    - 公開: GET /monster/select/all, GET /monster/select/{id}
+    - それ以外: Bearer(JWT) + role=admin 必須（実装側で認可）
+
+servers:
+  - url: http://localhost:8080
+    description: Local
+
+tags:
+  - name: Health
+    description: ヘルスチェック
+  - name: User
+    description: ユーザー関連
+  - name: Monster
+    description: モンスター関連
+  - name: Master
+    description: マスタ関連
+
+# デフォルトは認証必須（Bearer）
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      security: [] # 公開
+      summary: Health check
+      operationId: getHealth
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /user/login:
+    post:
+      tags: [User]
+      security: [] # 公開
+      summary: Login
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /user/register:
+    post:
+      tags: [User]
+      security: [] # 公開
+      summary: Register user
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RegisterResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /monster/register:
+    post:
+      tags: [Monster]
+      summary: Register monster
+      description: 管理者（role=admin）のみ
+      operationId: registerMonster
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data, iconImage, monsterImage]
+              properties:
+                data:
+                  type: string
+                  description: MonsterCreateRequest の JSON 文字列
+                iconImage:
+                  type: string
+                  format: binary
+                monsterImage:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterCreateResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /monster/update/{id}:
+    put:
+      tags: [Monster]
+      summary: Update monster
+      description: 管理者（role=admin）のみ
+      operationId: updateMonster
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+                  description: MonsterCreateRequest の JSON 文字列
+                iconImage:
+                  type: string
+                  format: binary
+                monsterImage:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterUpdateResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /monster/select/all:
+    get:
+      tags: [Monster]
+      security: [] # 公開
+      summary: Get monster list (full response)
+      description: |
+        公開API。
+        includeImages=true の場合、画像を base64 で含める（レスポンスが重くなる）
+      operationId: getMonsterFullList
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+        - name: rarity
+          in: query
+          schema: { type: integer }
+        - name: attributeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: tribeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: battleTypeId
+          in: query
+          schema: { type: integer, format: int64 }
+        - name: page
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, default: 20 }
+        - name: includeImages
+          in: query
+          schema: { type: boolean, default: true }
+          description: true の場合 base64 を返す（実装のデフォルトに合わせて true）
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterFullListResponse" }
+
+  /monster/select/{id}:
+    get:
+      tags: [Monster]
+      security: [] # 公開
+      summary: Get monster detail (full response)
+      description: |
+        公開API。
+        画像は base64 を含める（実装側で常に includeImages=true 相当）
+      operationId: getMonsterFullDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonsterFullResponse" }
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/select/all:
+    get:
+      tags: [Master]
+      summary: Select master list
+      description: 管理者（role=admin）のみ
+      operationId: selectMasterAll
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: true
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/register:
+    post:
+      tags: [Master]
+      summary: Register master (JSON)
+      description: |
+        管理者（role=admin）のみ。
+        リクエストボディは type ごとに異なるため additionalProperties=true で扱う。
+      operationId: registerMaster
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/update/{id}:
+    put:
+      tags: [Master]
+      summary: Update master (JSON)
+      description: 管理者（role=admin）のみ
+      operationId: updateMaster
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/register-with-image:
+    post:
+      tags: [Master]
+      summary: Register master (multipart with image)
+      description: |
+        管理者（role=admin）のみ。
+        - data: JSON文字列（masterの各typeに応じた内容）
+        - image: 画像ファイル
+      operationId: registerMasterWithImage
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data, image]
+              properties:
+                data:
+                  type: string
+                  description: master JSON文字列
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+  /master/{type}/update-with-image/{id}:
+    put:
+      tags: [Master]
+      summary: Update master (multipart with image)
+      description: |
+        管理者（role=admin）のみ。
+        - data: JSON文字列
+        - image: 任意
+      operationId: updateMasterWithImage
+      parameters:
+        - name: type
+          in: path
+          required: true
+          schema: { type: string }
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, format: int64 }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [data]
+              properties:
+                data:
+                  type: string
+                  description: master JSON文字列
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IdResponse" }
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "403":
+          description: Forbidden (requires role=admin)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ---------- Common ----------
+    IdResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id:
+          type: integer
+          format: int64
+
+    # ---------- Health ----------
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    # ---------- User ----------
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [id, email]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+
+    RegisterResponse:
+      type: object
+      additionalProperties: false
+      required: [id, email, name]
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string, format: email }
+        name: { type: string }
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 50
+          pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, name]
+      properties:
+        email: { type: string, format: email }
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 50
+          pattern: '^(?=.*[A-Z])(?=.*[a-zA-Z])(?=.*\d)[A-Za-z\d]{8,50}$'
+        name:
+          type: string
+          minLength: 1
+          maxLength: 50
+
+    # ---------- Error (Unified) ----------
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [code, message, details]
+      properties:
+        code:
+          type: string
+          description: |
+            - VALIDATION_ERROR
+            - UNAUTHORIZED
+            - FORBIDDEN
+            - EMAIL_ALREADY_USED
+            - INTERNAL_SERVER_ERROR
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required: [field, message]
+      properties:
+        field: { type: string }
+        message: { type: string }
+
+    # ---------- Monster: create/update ----------
+    MonsterCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id: { type: integer, format: int64 }
+
+    MonsterUpdateResponse:
+      type: object
+      additionalProperties: false
+      required: [id]
+      properties:
+        id: { type: integer, format: int64 }
+
+    # ---------- Monster: list/detail ----------
+    MonsterFullListResponse:
+      type: object
+      additionalProperties: false
+      required: [items, page, size, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MonsterFullResponse"
+        page: { type: integer }
+        size: { type: integer }
+        total: { type: integer, format: int64 }
+
+    MonsterFullResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - number
+        - name
+        - rarity
+        - evolutionStage
+        - attribute
+        - hitType
+        - tribe
+        - battleType
+        - status
+        - abilities
+        - connectSkill
+        - skills
+        - strikeShot
+        - friendshipCombo
+        - images
+      properties:
+        id: { type: integer, format: int64 }
+        number: { type: integer }
+        name: { type: string }
+
+        rarity: { $ref: "#/components/schemas/MonsterRarity" }
+        evolutionStage: { $ref: "#/components/schemas/MonsterEvolutionStage" }
+
+        attribute: { $ref: "#/components/schemas/NamedImage" }
+        hitType: { type: string }
+        tribe: { type: string }
+        battleType: { type: string }
+
+        status: { $ref: "#/components/schemas/MonsterStatus" }
+
+        luckSkill:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/NamedImage"
+
+        abilities: { $ref: "#/components/schemas/MonsterAbilities" }
+        connectSkill: { $ref: "#/components/schemas/MonsterConnectSkill" }
+        skills: { $ref: "#/components/schemas/MonsterSkills" }
+        strikeShot: { $ref: "#/components/schemas/MonsterStrikeShot" }
+        friendshipCombo: { $ref: "#/components/schemas/MonsterFriendshipCombo" }
+
+        series:
+          type: string
+          nullable: true
+
+        images: { $ref: "#/components/schemas/MonsterImages" }
+
+    ImageData:
+      type: object
+      additionalProperties: false
+      required: [path, mimeType, base64]
+      properties:
+        path:
+          type: string
+        mimeType:
+          type: string
+          nullable: true
+          example: image/png
+        base64:
+          type: string
+          nullable: true
+          description: includeImages=true のときに値が入る（詳細は常に入る想定）
+
+    NamedImage:
+      type: object
+      additionalProperties: false
+      required: [name, image]
+      properties:
+        name: { type: string }
+        image: { $ref: "#/components/schemas/ImageData" }
+
+    MonsterRarity:
+      type: object
+      additionalProperties: false
+      required: [value, maxLevel]
+      properties:
+        value: { type: integer }
+        maxLevel: { type: integer }
+
+    MonsterEvolutionStage:
+      type: object
+      additionalProperties: false
+      required: [name, levelCapRelease, superBattleRelease]
+      properties:
+        name: { type: string }
+        levelCapRelease: { type: boolean }
+        superBattleRelease: { type: boolean }
+
+    MonsterStatus:
+      type: object
+      additionalProperties: false
+      required: [hp, attack, speed]
+      properties:
+        hp: { $ref: "#/components/schemas/MonsterStat" }
+        attack: { $ref: "#/components/schemas/MonsterStat" }
+        speed: { $ref: "#/components/schemas/MonsterSpeed" }
+
+    MonsterStat:
+      type: object
+      additionalProperties: false
+      required: [max, plusMax]
+      properties:
+        max: { type: integer }
+        plusMax: { type: integer }
+
+    MonsterSpeed:
+      type: object
+      additionalProperties: false
+      required: [max, plusMax]
+      properties:
+        max: { type: number, format: double }
+        plusMax: { type: number, format: double }
+
+    MonsterAbilities:
+      type: object
+      additionalProperties: false
+      required: [base, gauge]
+      properties:
+        base:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+        gauge:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+
+    MonsterAbility:
+      type: object
+      additionalProperties: false
+      required: [name, stage]
+      properties:
+        name: { type: string }
+        stage: { type: string, nullable: true }
+
+    MonsterConnectSkill:
+      type: object
+      additionalProperties: false
+      required: [condition, abilities]
+      properties:
+        condition: { type: string, nullable: true }
+        abilities:
+          type: array
+          items: { $ref: "#/components/schemas/MonsterAbility" }
+
+    MonsterSkills:
+      type: object
+      additionalProperties: false
+      required: [shot, assist]
+      properties:
+        shot: { type: string, nullable: true }
+        assist: { type: string, nullable: true }
+
+    MonsterStrikeShot:
+      type: object
+      additionalProperties: false
+      required: [name, effect]
+      properties:
+        name: { type: string, nullable: true }
+        effect: { type: string, nullable: true }
+
+    MonsterFriendshipCombo:
+      type: object
+      additionalProperties: false
+      required: [main, sub]
+      properties:
+        main: { $ref: "#/components/schemas/MonsterFriendship" }
+        sub:
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/MonsterFriendship"
+
+    MonsterFriendship:
+      type: object
+      additionalProperties: false
+      required: [name, attribute, category, description, power, image]
+      properties:
+        name: { type: string }
+        attribute: { $ref: "#/components/schemas/NamedImage" }
+        category: { type: string }
+        description: { type: string }
+        power: { type: integer, nullable: true }
+        image: { $ref: "#/components/schemas/ImageData" }
+
+    MonsterImages:
+      type: object
+      additionalProperties: false
+      required: [icon, monster]
+      properties:
+        icon: { $ref: "#/components/schemas/ImageData" }
+        monster: { $ref: "#/components/schemas/ImageData" }

@@ -2,7 +2,7 @@ package com.monst.service;
 
 import com.monst.dto.request.MonsterCreateRequest;
 import com.monst.exception.BadRequestException;
-import com.monst.repository.MasterRepository;
+import com.monst.repository.MasterExistenceRepository;
 import com.monst.repository.MonsterRepository;
 
 import java.nio.file.Files;
@@ -23,16 +23,16 @@ import org.springframework.web.server.ResponseStatusException;
 public class MonsterService {
 
     private final MonsterRepository monsterRepository;
-    private final MasterRepository masterRepository;
+    private final MasterExistenceRepository masterExistenceRepository;
 
     private static final @NonNull Path IMAGE_ROOT = Paths.get("uploads", "monsters");
     private static final Set<String> ALLOWED_EXT = Set.of("png", "jpg", "jpeg", "webp");
 
     public MonsterService(
             MonsterRepository monsterRepository,
-            MasterRepository masterRepository) {
+            MasterExistenceRepository masterExistenceRepository) {
         this.monsterRepository = monsterRepository;
-        this.masterRepository = masterRepository;
+        this.masterExistenceRepository = masterExistenceRepository;
     }
 
     @Transactional
@@ -84,6 +84,7 @@ public class MonsterService {
             @NonNull MonsterCreateRequest req,
             MultipartFile iconImage,
             MultipartFile monsterImage) {
+
         if (!monsterRepository.existsById(id)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Monster not found: " + id);
         }
@@ -140,7 +141,8 @@ public class MonsterService {
             @NonNull String column,
             long value,
             @NonNull String fieldName) {
-        if (!masterRepository.existsByValue(table, column, value)) {
+
+        if (!masterExistenceRepository.existsByValue(table, column, value)) {
             throw new BadRequestException(fieldName + " not found: " + value);
         }
     }

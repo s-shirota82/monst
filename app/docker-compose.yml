@@ -14,7 +14,16 @@ services:
       - mysql_data:/var/lib/mysql
       - ./mysql/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "127.0.0.1",
+          "-uroot",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20
@@ -37,7 +46,7 @@ services:
     volumes:
       - ./backend:/workspace
       - backend_gradle_cache:/home/gradle/.gradle
-    # mysql の起動完了を待ってから bootRun（DB接続エラーで落ちっぱなしを防ぐ）
+      - /workspace/build
     command: sh -lc "apt-get update >/dev/null 2>&1 && apt-get install -y netcat-openbsd >/dev/null 2>&1; until nc -z mysql 3306; do echo 'waiting for mysql...'; sleep 1; done; gradle bootRun --no-daemon"
     depends_on:
       mysql:
@@ -51,9 +60,7 @@ services:
     environment:
       TZ: Asia/Tokyo
       NODE_ENV: development
-      # ブラウザから呼ぶ前提（SSRでコンテナ内から呼ぶなら http://backend:8080 を検討）
-      NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
-      # Docker/WSL/Windows のファイル変更検知を安定化
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL}
       WATCHPACK_POLLING: "true"
       WATCHPACK_POLLING_INTERVAL: "500"
     ports:
@@ -62,7 +69,6 @@ services:
       - ./frontend:/app
       - frontend_node_modules:/app/node_modules
       - frontend_next_cache:/app/.next
-    # next が無ければ install（空ディレクトリで install がスキップされる問題を回避）
     command: sh -lc "corepack enable && (test -x node_modules/.bin/next || pnpm install) && pnpm dev -p 3000"
     depends_on:
       - backend
