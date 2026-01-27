@@ -27,10 +27,9 @@ export default function LoginPage() {
     try {
       const ok = await login(email.trim(), password);
       if (!ok) {
-        setError("ログインに失敗しました。");
+        setError("メールアドレスまたはパスワードが正しくありません。");
         return;
       }
-
       router.push("/monsters");
     } finally {
       setSubmitting(false);
